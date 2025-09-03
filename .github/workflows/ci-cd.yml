@@ -116,6 +116,7 @@ jobs:
       - name: Install Wrangler
         run: npm i -g wrangler
 
+      # --- Pages (Next.js) ---
       - name: Install app deps (for Pages)
         if: hashFiles('app/**') != ''
         working-directory: app
@@ -125,6 +126,12 @@ jobs:
         if: hashFiles('app/**') != ''
         working-directory: app
         run: npm run build
+
+      # --- Worker (Cloudflare Workers) ---
+      - name: Install worker deps (for Worker)
+        if: hashFiles('workers/**') != ''
+        working-directory: workers
+        run: npm ci || npm i
 
       - name: Deploy Worker (skip if folder absent)
         if: hashFiles('workers/**') != ''
