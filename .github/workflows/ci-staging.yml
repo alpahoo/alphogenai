@@ -1,9 +1,8 @@
 name: ci-staging
-
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: {}
+    paths-ignore: [ "**.md" ]
 
 permissions:
   id-token: write
@@ -11,30 +10,33 @@ permissions:
   pull-requests: write
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: "20"
+  WORKER_NAME: ${{ vars.CF_WORKER_NAME }}
+  ROUTE_PATTERN: "api-staging.alphogenai.com/*"
 
 jobs:
   test_build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: Install app deps (skip if folder absent)
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: ${{ env.NODE_VERSION }} }
+
+      - name: Install app deps (Pages) (skip if folder absent)
         if: hashFiles('app/**') != ''
         working-directory: app
         run: npm ci || npm i
+
       - name: Build app (skip if folder absent)
         if: hashFiles('app/**') != ''
         working-directory: app
         run: npm run build --if-present
+
       - name: Install worker deps (skip if folder absent)
         if: hashFiles('workers/**') != ''
         working-directory: workers
         run: npm ci || npm i
+
       - name: Typecheck worker (skip if folder absent)
         if: hashFiles('workers/**') != ''
         working-directory: workers
@@ -44,91 +46,85 @@ jobs:
     runs-on: ubuntu-latest
     needs: test_build
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: Setup Pulumi
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: ${{ env.NODE_VERSION }} }
+
+      - name: Setup Pulumi CLI
         uses: pulumi/setup-pulumi@v2
+
       - name: Install infra deps
+        if: hashFiles('infra/**') != ''
         working-directory: infra
-        run: npm install --no-audit --no-fund
+        run: npm ci || npm i
+
+      # Sécurité : on supprime une route existante identique (si elle traîne)
+      - name: Pre-delete conflicting route (safe)
+        run: |
+          set -e
+          ZONE="${{ vars.CF_DNS_ZONE }}"
+          TOKEN="${{ secrets.CF_API_TOKEN }}"
+          PATTERN="${{ env.ROUTE_PATTERN }}"
+          echo "Check route pattern: $PATTERN"
+          LIST=$(curl -s -H "Authorization: Bearer $TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZONE/workers/routes")
+          ID=$(echo "$LIST" | jq -r --arg p "$PATTERN" '.result[]?|select(.pattern==$p)|.id' || true)
+          if [ -n "$ID" ] && [ "$ID" != "null" ]; then
+            echo "Deleting existing route $ID"
+            curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
+              "https://api.cloudflare.com/client/v4/zones/$ZONE/workers/routes/$ID" >/dev/null
+          else
+            echo "No pre-existing route."
+          fi
 
       - name: Ensure Pulumi stack (staging)
+        if: hashFiles('infra/**') != ''
         working-directory: infra
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
-          CF_ACCOUNT_ID:       ${{ vars.CF_ACCOUNT_ID }}
-          CF_DNS_ZONE:         ${{ vars.CF_DNS_ZONE }}
-          PAGES_PROJECT:       ${{ vars.CF_PAGES_PROJECT }}
-          WORKER_NAME:         ${{ vars.CF_WORKER_NAME }}
         run: |
           pulumi stack select staging || pulumi stack init staging
-          pulumi config set cfAccountId   "$CF_ACCOUNT_ID" --stack staging
-          pulumi config set cfDnsZone     "$CF_DNS_ZONE"   --stack staging
-          pulumi config set cfPagesProject "$PAGES_PROJECT" --stack staging
-          pulumi config set cfWorkerName   "$WORKER_NAME"   --stack staging
-          pulumi config set apiSubdomain  "api-staging"    --stack staging
+          pulumi config set cfAccountId  ${{ vars.CF_ACCOUNT_ID }} --stack staging
+          pulumi config set cfZoneId     ${{ vars.CF_DNS_ZONE }}   --stack staging
+          pulumi config set workerName   ${{ env.WORKER_NAME }}    --stack staging
 
       - name: Pulumi up (staging)
+        if: hashFiles('infra/**') != ''
         uses: pulumi/actions@v4
         with:
           command: up
           stack-name: staging
           work-dir: infra
         env:
-          PULUMI_ACCESS_TOKEN:     ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
           PULUMI_CONFIG_PASSPHRASE: ""
-          CLOUDFLARE_API_TOKEN:    ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID:           ${{ vars.CF_ACCOUNT_ID }}
-          CF_DNS_ZONE:             ${{ vars.CF_DNS_ZONE }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
 
   app_deploy:
     runs-on: ubuntu-latest
     needs: infra_deploy
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: ${{ env.NODE_VERSION }} }
+
       - name: Install Wrangler
         run: npm i -g wrangler
 
-      # Pages
-      - name: Install app deps
-        working-directory: app
-        run: npm ci || npm i
-      - name: Build app
-        working-directory: app
-        run: npm run build
-
-      # Worker
-      - name: Install worker deps
-        working-directory: workers
-        run: npm ci || npm i
-      - name: Deploy Worker (staging)
+      - name: Deploy Worker (staging) (skip if folder absent)
+        if: hashFiles('workers/**') != ''
         working-directory: workers
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN:  ${{ secrets.CF_API_TOKEN }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: wrangler deploy
 
-      - name: Publish Pages (staging)
+      - name: Publish Pages (staging) (skip if folder absent)
+        if: hashFiles('app/**') != ''
         working-directory: app
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN:  ${{ secrets.CF_API_TOKEN }}
-          PROJECT_NAME:          ${{ vars.CF_PAGES_PROJECT }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: |
-          echo "PROJECT_NAME=$PROJECT_NAME"
-          if [ -z "$PROJECT_NAME" ]; then
-            echo "::error::CF_PAGES_PROJECT is empty. Set it in GitHub repo variables."
-            exit 1
-          fi
-          # Crée le projet s'il n'existe pas (tolère l'échec si déjà créé)
-          npx wrangler pages project create "$PROJECT_NAME" --production-branch main || true
-          npx wrangler pages deploy ./out --project-name "$PROJECT_NAME"
+          npm run build --if-present
+          npx wrangler pages deploy ./out --project-name "${{ vars.CF_PAGES_PROJECT_STAGING }}"
