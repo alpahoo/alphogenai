@@ -1,0 +1,8 @@
+{
+  "name": "infra",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "build": "tsc -p tsconfig.json", "up": "pulumi up", "preview": "pulumi preview" },
+  "dependencies": { "@pulumi/pulumi": "^3.0.0", "@pulumi/cloudflare": "^5.30.0" },
+  "devDependencies": { "typescript": "^5.4.0" }
+}
