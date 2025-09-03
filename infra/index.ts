@@ -2,38 +2,29 @@ import * as pulumi from "@pulumi/pulumi";
 import * as cloudflare from "@pulumi/cloudflare";
 
 const cfg = new pulumi.Config();
+const accountId      = cfg.require("cfAccountId");
+const dnsZone        = cfg.require("cfDnsZone");
+const pagesProject   = cfg.require("cfPagesProject");
+const workerName     = cfg.require("cfWorkerName");
+const apiSubdomain   = cfg.require("apiSubdomain"); // "api" en prod, "api-staging" en staging
 
-const accountId = process.env.CF_ACCOUNT_ID ?? cfg.require("cfAccountId");
-const zoneName  = process.env.CF_DNS_ZONE   ?? cfg.require("cfDnsZone");
-const pagesProj = process.env.CF_PAGES_PROJECT ?? cfg.get("cfPagesProject") ?? "alphogenai-app";
-const workerName = process.env.CF_WORKER_NAME ?? cfg.get("cfWorkerName") ?? "alphogenai-worker";
+// Récupère la zone Cloudflare (pour les routes Workers)
+const zone = cloudflare.getZoneOutput({ name: dnsZone });
 
-// 👇 nouveau : API_SUBDOMAIN (ex: "api" ou "api-staging")
-const apiSubdomain = process.env.API_SUBDOMAIN ?? cfg.get("apiSubdomain") ?? "api";
-
-const zone = cloudflare.getZoneOutput({ name: zoneName });
-
-const apiCname = new cloudflare.Record("apiCname", {
-  zoneId: zone.id,
-  name: apiSubdomain,
-  type: "CNAME",
-  value: zoneName,
-  proxied: true,
+// 👉 IMPORTANT : on NE CRÉE PLUS le projet Pages.
+//    On le "lit" seulement par son nom ; s'il n'existe pas, Wranger (app_deploy) le créera.
+const existingPages = cloudflare.getPagesProjectOutput({
+  accountId,
+  name: pagesProject,
 });
 
-const workerRoute = new cloudflare.WorkerRoute("apiRoute", {
+// Route Worker: https://{apiSubdomain}.{dnsZone}/*
+new cloudflare.WorkerRoute("api-route", {
   zoneId: zone.id,
-  pattern: `${apiSubdomain}.${zoneName}/*`,
+  pattern: pulumi.interpolate`${apiSubdomain}.${dnsZone}/*`,
   scriptName: workerName,
 });
 
-const pagesProject = new cloudflare.PagesProject("appPages", {
-  accountId,
-  name: pagesProj,
-  productionBranch: "main",
-  buildConfig: { buildCommand: "npm run build", destinationDir: "out" },
-});
-
-export const apiRecord = apiCname.name;
-export const routePattern = workerRoute.pattern;
-export const pages = pagesProject.name;
+// Exports (pour logs Pulumi)
+export const apiUrl = pulumi.interpolate`https://${apiSubdomain}.${dnsZone}`;
+export const pagesName = existingPages.name;
