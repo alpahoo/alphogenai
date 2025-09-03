@@ -47,9 +47,9 @@ jobs:
 
       # Installe les deps Node de ton programme Pulumi
       - name: Install infra deps
-        if: hashFiles('infra/**') != ''
-        working-directory: infra
-        run: npm ci
+      if: hashFiles('infra/**') != ''
+      working-directory: infra
+      run: npm install --no-audit --no-fund
 
       - name: Ensure Pulumi stack
         if: hashFiles('infra/**') != ''
