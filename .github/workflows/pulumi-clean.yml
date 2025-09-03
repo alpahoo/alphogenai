@@ -31,6 +31,18 @@ jobs:
         working-directory: infra
         run: npm ci || npm i
 
+      # 👉 Pose les configs de stack AVANT refresh/up
+      - name: Ensure Pulumi config (stack)
+        working-directory: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+        run: |
+          set -e
+          pulumi stack select "${{ github.event.inputs.stack }}" || pulumi stack init "${{ github.event.inputs.stack }}"
+          pulumi config set cfAccountId    "${{ vars.CF_ACCOUNT_ID }}"     --stack "${{ github.event.inputs.stack }}"
+          pulumi config set cfDnsZone      "${{ vars.CF_DNS_ZONE }}"       --stack "${{ github.event.inputs.stack }}"
+          pulumi config set cfWorkerName   "${{ vars.CF_WORKER_NAME }}"    --stack "${{ github.event.inputs.stack }}"
+
       - name: Pulumi state cleanup
         working-directory: infra
         env:
@@ -42,13 +54,13 @@ jobs:
           pulumi stack select "${{ github.event.inputs.stack }}"
 
           echo "=== Etat AVANT ==="
-          pulumi state ls
+          pulumi state ls || true
 
-          echo "=== Supprime les anciennes PagesProject (on ne les gère plus via Pulumi) ==="
+          echo "=== Supprime d'anciens PagesProject suivis (on ne les gère plus via Pulumi) ==="
           pulumi state ls --json | jq -r '.[] | select(.type=="cloudflare:index/pagesProject:PagesProject") | .urn' \
             | xargs -r -n1 pulumi state delete -y
 
-          echo "=== Supprime les anciennes routes orphelines si présentes ==="
+          echo "=== Supprime d'éventuelles routes orphelines dans le state ==="
           pulumi state ls --json | jq -r '.[] | select(.type=="cloudflare:index/workerRoute:WorkerRoute") | .urn' \
             | xargs -r -n1 pulumi state delete -y
 
