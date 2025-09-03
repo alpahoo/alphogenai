@@ -1,134 +1,39 @@
-name: ci-cd
-on:
-  workflow_dispatch: {}  # (on pourra activer "push" une fois validé)
+app_deploy:
+  runs-on: ubuntu-latest
+  needs: infra_deploy
+  steps:
+    - uses: actions/checkout@v4
 
-permissions:
-  id-token: write
-  contents: read
-  pull-requests: write
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
 
-jobs:
-  test_build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    - name: Install Wrangler
+      run: npm i -g wrangler
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+    # ✅ Installer les deps de l'app AVANT le build
+    - name: Install app deps (for Pages)
+      if: hashFiles('app/**') != ''
+      working-directory: app
+      run: npm ci || npm i
 
-      - name: Install app deps (skip if folder absent)
-        if: hashFiles('app/**') != ''
-        working-directory: app
-        run: npm ci || npm i
+    - name: Build app
+      if: hashFiles('app/**') != ''
+      working-directory: app
+      run: npm run build
 
-      - name: Build app (skip if folder absent)
-        if: hashFiles('app/**') != ''
-        working-directory: app
-        run: npm run build --if-present
+    - name: Deploy Worker (skip if folder absent)
+      if: hashFiles('workers/**') != ''
+      working-directory: workers
+      env:
+        CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+        CF_API_TOKEN:         ${{ secrets.CF_API_TOKEN }}
+      run: wrangler deploy
 
-      - name: Install worker deps (skip if folder absent)
-        if: hashFiles('workers/**') != ''
-        working-directory: workers
-        run: npm ci || npm i
-
-      - name: Typecheck worker (skip if folder absent)
-        if: hashFiles('workers/**') != ''
-        working-directory: workers
-        run: npm run typecheck --if-present
-
-  infra_deploy:
-    runs-on: ubuntu-latest
-    needs: test_build
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Setup Pulumi CLI
-        uses: pulumi/setup-pulumi@v2
-
-      - name: Install infra deps
-        if: hashFiles('infra/**') != ''
-        working-directory: infra
-        run: npm install --no-audit --no-fund
-
-      - name: Ensure Pulumi stack
-        if: hashFiles('infra/**') != ''
-        working-directory: infra
-        env:
-          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
-        run: |
-          pulumi stack select staging || pulumi stack init staging
-          pulumi config set cfAccountId     ${{ vars.CF_ACCOUNT_ID }}     --stack staging
-          pulumi config set cfDnsZone       ${{ vars.CF_DNS_ZONE }}       --stack staging
-          pulumi config set cfR2Bucket      ${{ vars.CF_R2_BUCKET }}      --stack staging
-          pulumi config set cfWorkerName    ${{ vars.CF_WORKER_NAME }}    --stack staging
-          pulumi config set cfPagesProject  ${{ vars.CF_PAGES_PROJECT }}  --stack staging
-
-      - name: Pulumi preview
-        if: hashFiles('infra/**') != ''
-        uses: pulumi/actions@v4
-        with:
-          command: preview
-          stack-name: staging
-          work-dir: infra
-        env:
-          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
-          PULUMI_CONFIG_PASSPHRASE: ""
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID:    ${{ vars.CF_ACCOUNT_ID }}
-          CF_DNS_ZONE:      ${{ vars.CF_DNS_ZONE }}
-          CF_R2_BUCKET:     ${{ vars.CF_R2_BUCKET }}
-          CF_WORKER_NAME:   ${{ vars.CF_WORKER_NAME }}
-          CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
-
-      - name: Pulumi up
-        if: hashFiles('infra/**') != ''
-        uses: pulumi/actions@v4
-        with:
-          command: up
-          stack-name: staging
-          work-dir: infra
-        env:
-          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
-          PULUMI_CONFIG_PASSPHRASE: ""
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID:    ${{ vars.CF_ACCOUNT_ID }}
-          CF_DNS_ZONE:      ${{ vars.CF_DNS_ZONE }}
-          CF_R2_BUCKET:     ${{ vars.CF_R2_BUCKET }}
-          CF_WORKER_NAME:   ${{ vars.CF_WORKER_NAME }}
-          CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
-
-  app_deploy:
-    runs-on: ubuntu-latest
-    needs: infra_deploy
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Wrangler
-        run: npm i -g wrangler
-
-      - name: Deploy Worker (skip if folder absent)
-        if: hashFiles('workers/**') != ''
-        working-directory: workers
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-          CF_API_TOKEN:         ${{ secrets.CF_API_TOKEN }}
-        run: wrangler deploy
-
-      - name: Publish Pages (skip if folder absent)
-        if: hashFiles('app/**') != ''
-        working-directory: app
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-          CF_API_TOKEN:         ${{ secrets.CF_API_TOKEN }}
-        run: |
-          npm run build --if-present
-          npx wrangler pages deploy ./out --project-name ${{ vars.CF_PAGES_PROJECT }}
+    - name: Publish Pages
+      if: hashFiles('app/**') != ''
+      working-directory: app
+      env:
+        CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+        CF_API_TOKEN:         ${{ secrets.CF_API_TOKEN }}
+      run: npx wrangler pages deploy ./out --project-name ${{ vars.CF_PAGES_PROJECT }}
