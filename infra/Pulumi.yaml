@@ -1,0 +1,3 @@
+name: alphogenai-infra
+runtime: nodejs
+description: Pulumi IaC for Cloudflare (Workers, Pages, R2)
