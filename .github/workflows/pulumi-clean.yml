@@ -1,0 +1,53 @@
+name: pulumi-clean
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: "Stack à nettoyer (staging ou prod)"
+        required: true
+        default: "staging"
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+
+      - name: Installer Pulumi CLI
+        uses: pulumi/setup-pulumi@v2
+
+      - name: Installer jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Pulumi state cleanup
+        working-directory: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          PULUMI_CONFIG_PASSPHRASE: ""
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          set -e
+          pulumi stack select "${{ github.event.inputs.stack }}"
+
+          echo "=== Liste des ressources suivies (avant) ==="
+          pulumi state ls
+
+          echo "=== Suppression des anciennes PagesProject (on ne veut plus que Pulumi les gère) ==="
+          pulumi state ls --json | jq -r '.[] | select(.type=="cloudflare:index/pagesProject:PagesProject") | .urn' \
+            | xargs -r -n1 pulumi state delete -y
+
+          echo "=== Suppression des anciennes routes orphelines (si présentes) ==="
+          pulumi state ls --json | jq -r '.[] | select(.type=="cloudflare:index/workerRoute:WorkerRoute") | .urn' \
+            | xargs -r -n1 pulumi state delete -y
+
+          echo "=== Rafraîchir l’état ==="
+          pulumi refresh -y
+
+          echo "=== Recréation par le code actuel ==="
+          pulumi up -y
+
+          echo "=== État final ==="
+          pulumi state ls
