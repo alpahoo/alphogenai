@@ -1,6 +1,10 @@
 name: ci-cd
 on:
-  workflow_dispatch: {}  # (on pourra activer "push" une fois validé)
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: {}
 
 permissions:
   id-token: write
@@ -112,7 +116,6 @@ jobs:
       - name: Install Wrangler
         run: npm i -g wrangler
 
-      # Installer les deps de l'app AVANT le build Pages
       - name: Install app deps (for Pages)
         if: hashFiles('app/**') != ''
         working-directory: app
@@ -128,7 +131,7 @@ jobs:
         working-directory: workers
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-          CF_API_TOKEN:         ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CF_API_TOKEN }}
         run: wrangler deploy
 
       - name: Publish Pages
@@ -136,5 +139,5 @@ jobs:
         working-directory: app
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-          CF_API_TOKEN:         ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CF_API_TOKEN }}
         run: npx wrangler pages deploy ./out --project-name ${{ vars.CF_PAGES_PROJECT }}
