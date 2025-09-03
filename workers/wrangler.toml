@@ -1,11 +1,9 @@
-name = "alphogenai-worker"            # = CF_WORKER_NAME
+name = "alphogenai-worker"
 main = "src/index.ts"
 compatibility_date = "2024-06-20"
-account_id = "a3ac983a6a5ce4bb150638e1f620c2a7"   # mets l'ID exact (ex: a3ac98...)
-
+account_id = "TON_CLOUDFLARE_ACCOUNT_ID"  # remplace par ton vrai ID
 workers_dev = true
 
 [[r2_buckets]]
-binding = "R2_BUCKET"                # = CF_R2_BINDING
-bucket_name = "alphogenai-assets"    # = CF_R2_BUCKET (existant)
-
+binding = "R2_BUCKET"
+bucket_name = "alphogenai-assets"         # ton bucket R2 existant
