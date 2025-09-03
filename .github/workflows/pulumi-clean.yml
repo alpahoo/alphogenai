@@ -1,4 +1,5 @@
 name: pulumi-clean
+
 on:
   workflow_dispatch:
     inputs:
@@ -10,17 +11,25 @@ on:
 jobs:
   clean:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-      - name: Installer Pulumi CLI
+      - name: Setup Pulumi CLI
         uses: pulumi/setup-pulumi@v2
 
-      - name: Installer jq
+      - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Install infra deps (Node)
+        working-directory: infra
+        run: npm ci || npm i
 
       - name: Pulumi state cleanup
         working-directory: infra
@@ -32,22 +41,22 @@ jobs:
           set -e
           pulumi stack select "${{ github.event.inputs.stack }}"
 
-          echo "=== Liste des ressources suivies (avant) ==="
+          echo "=== Etat AVANT ==="
           pulumi state ls
 
-          echo "=== Suppression des anciennes PagesProject (on ne veut plus que Pulumi les gère) ==="
+          echo "=== Supprime les anciennes PagesProject (on ne les gère plus via Pulumi) ==="
           pulumi state ls --json | jq -r '.[] | select(.type=="cloudflare:index/pagesProject:PagesProject") | .urn' \
             | xargs -r -n1 pulumi state delete -y
 
-          echo "=== Suppression des anciennes routes orphelines (si présentes) ==="
+          echo "=== Supprime les anciennes routes orphelines si présentes ==="
           pulumi state ls --json | jq -r '.[] | select(.type=="cloudflare:index/workerRoute:WorkerRoute") | .urn' \
             | xargs -r -n1 pulumi state delete -y
 
-          echo "=== Rafraîchir l’état ==="
+          echo "=== Refresh ==="
           pulumi refresh -y
 
-          echo "=== Recréation par le code actuel ==="
+          echo "=== Re-create selon le code actuel ==="
           pulumi up -y
 
-          echo "=== État final ==="
+          echo "=== Etat APRES ==="
           pulumi state ls
