@@ -1,16 +1,19 @@
 export interface Env {
   APP_ADMIN_TOKEN: string;
   WEBHOOK_SECRET: string;
-  RUNPOD_API_KEY?: string;
-  RUNPOD_ENDPOINT_ID?: string;     // ex: "xxxxxxxxxxxxxxxxxxxx"
-  RUNPOD_API_URL?: string;         // optionnel si tu préfères fournir l'URL complète
 
-  ASSETS?: R2Bucket;               // ton bucket R2 (déjà en place)
+  RUNPOD_API_KEY?: string;
+  RUNPOD_ENDPOINT_ID?: string;      // ex: "xxxxxxxxxxxxxxxxxxxx"
+  RUNPOD_API_URL?: string;          // si tu préfères fournir l'URL complète
+
+  ASSETS?: R2Bucket;                // ton bucket R2 (déjà lié côté CF)
   R2?: R2Bucket;
   BUCKET?: R2Bucket;
 }
 
-type JSONValue = null | string | number | boolean | JSONValue[] | { [k: string]: JSONValue };
+type JSONValue =
+  | null | string | number | boolean
+  | JSONValue[] | { [k: string]: JSONValue };
 
 const cors = () => ({
   "access-control-allow-origin": "*",
@@ -18,21 +21,24 @@ const cors = () => ({
   "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
 });
 const json = (data: JSONValue, status = 200) =>
-  new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", ...cors() } });
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", ...cors() },
+  });
 const notFound = () => json({ ok: false, error: "not_found" }, 404);
 const unauthorized = () => json({ ok: false, error: "unauthorized" }, 401);
 
 const isAdmin = (req: Request, env: Env) => {
   const h = req.headers.get("authorization") || "";
   const m = /^bearer\s+(.+)$/i.exec(h);
-  return m && m[1] === env.APP_ADMIN_TOKEN;
+  return !!m && m[1] === env.APP_ADMIN_TOKEN;
 };
 const isWebhook = (req: Request, env: Env) =>
   (req.headers.get("x-webhook-secret") || "") === env.WEBHOOK_SECRET;
 
 const getR2 = (env: Env) => env.ASSETS || env.R2 || env.BUCKET;
 
-/** --- RunPod --- */
+/* ---------- RunPod helpers ---------- */
 function runpodBase(env: Env) {
   if (env.RUNPOD_API_URL) return env.RUNPOD_API_URL.replace(/\/+$/, "");
   if (env.RUNPOD_ENDPOINT_ID) return `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}`;
@@ -52,6 +58,7 @@ async function runpodStart(env: Env, input: any) {
 async function runpodStatus(env: Env, id: string) {
   const base = runpodBase(env);
   if (!base || !env.RUNPOD_API_KEY) throw new Error("runpod_not_configured");
+  // POST status (nouvelle API), fallback GET si 404
   let r = await fetch(`${base}/status/${encodeURIComponent(id)}`, {
     method: "POST",
     headers: { authorization: `Bearer ${env.RUNPOD_API_KEY}` },
@@ -65,6 +72,7 @@ async function runpodStatus(env: Env, id: string) {
   return r.json<any>();
 }
 
+/* ---------- Worker ---------- */
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
@@ -72,17 +80,20 @@ export default {
 
     if (req.method === "OPTIONS") return new Response(null, { headers: cors() });
 
+    // health
     if (req.method === "GET" && path === "/health") {
       return json({ ok: true, ts: Date.now() });
     }
 
+    // webhooks
     if (path.startsWith("/webhooks/")) {
       if (!isWebhook(req, env)) return unauthorized();
-      let received: any = null;
-      try { received = await req.json(); } catch {}
-      return json({ ok: true, path, received });
+      let body: any = null;
+      try { body = await req.json(); } catch {}
+      return json({ ok: true, path, received: body });
     }
 
+    // assets (R2)
     if (path.startsWith("/assets/")) {
       const key = path.replace(/^\/assets\//, "");
       const r2 = getR2(env);
@@ -90,8 +101,8 @@ export default {
 
       if (req.method === "PUT") {
         if (!isAdmin(req, env)) return unauthorized();
-        const body = await req.arrayBuffer();
-        await r2.put(key, body, {
+        const buf = await req.arrayBuffer();
+        await r2.put(key, buf, {
           httpMetadata: { contentType: req.headers.get("content-type") ?? "application/octet-stream" },
         });
         return json({ ok: true, key });
@@ -106,6 +117,7 @@ export default {
       return json({ ok: false, error: "method_not_allowed" }, 405);
     }
 
+    // jobs → RunPod uniquement (pas de Supabase ici)
     if (req.method === "POST" && path === "/jobs") {
       if (!isAdmin(req, env)) return unauthorized();
       let payload: any = {};
