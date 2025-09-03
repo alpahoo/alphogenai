@@ -13,10 +13,15 @@ const bucket = new cloudflare.R2Bucket("assetsBucket", { accountId, name: r2Buck
 
 // Worker (avec binding R2)
 const script = new cloudflare.WorkerScript("apiWorkerScript", {
-  accountId, name: workerName, module: true,
+  accountId,
+  name: workerName,
+  module: true,
   content: `export default { async fetch(req, env) { return new Response('ok from worker') } }`,
-  r2Buckets: [{ variableName: process.env.CF_R2_BINDING || "R2_BUCKET", bucketName: bucket.name }],
-});
+  // ⬇️ Correct: r2BucketBindings (pas "r2Buckets") + champ "name"
+  r2BucketBindings: [{
+    name: process.env.CF_R2_BINDING || "R2_BUCKET",
+    bucketName: bucket.name,
+  }],
 
 // DNS zone + route Worker (api.alphogen.com/*)
 const zone = cloudflare.getZoneOutput({ name: zoneName });
