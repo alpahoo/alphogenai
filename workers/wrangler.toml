@@ -1,10 +1,12 @@
 name = "alphogenai-worker"
 main = "src/index.ts"
-compatibility_date = "2024-06-20"
-workers_dev = true
-# Si tu vois plus tard des erreurs "process"/"Buffer", dé-commente la ligne suivante :
-# compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2024-11-01"
 
-[[r2_buckets]]
-binding = "R2_BUCKET"
-bucket_name = "alphogenai-assets"
+# On lit l'account_id depuis la variable GitHub (CI)
+account_id = "${CF_ACCOUNT_ID}"
+
+[observability]
+enabled = true
+
+[vars]
+# Vos variables runtime si nécessaire (exposées côté worker)
