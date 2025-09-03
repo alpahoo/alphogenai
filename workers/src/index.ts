@@ -1,25 +1,25 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Types d'environnement (noms = variables/bindings existants)
+/** Types Env = nom des bindings & secrets configurés dans Cloudflare */
 type Env = {
-  // Binding R2 (déclaré dans wrangler.toml)
   R2_BUCKET: R2Bucket;
 
-  // Secrets/vars Worker (Settings → Variables & Secrets)
-  APP_ADMIN_TOKEN?: string;        // pour protéger PUT /assets et POST /jobs
-  WEBHOOK_SECRET?: string;         // pour POST /webhooks/*
-  RUNPOD_API_KEY?: string;         // clé RunPod (optionnel)
-  RUNPOD_ENDPOINT_ID?: string;     // endpointId RunPod (optionnel)
-  SUPABASE_URL?: string;           // URL du projet Supabase (optionnel)
-  SUPABASE_SERVICE_ROLE?: string;  // clé service role (optionnel)
+  APP_ADMIN_TOKEN?: string;
+  WEBHOOK_SECRET?: string;
+
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE?: string;
+
+  RUNPOD_API_KEY?: string;
+  RUNPOD_ENDPOINT_ID?: string;
 };
 
-// Utilitaires réponse
 const CORS = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "authorization,content-type,x-webhook-secret",
-  "access-control-allow-methods": "GET,PUT,POST,OPTIONS",
+  "access-control-allow-methods": "GET,PUT,POST,OPTIONS"
 };
+
 const json = (data: unknown, status = 200, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", ...CORS, ...extra } });
 const text = (data: string, status = 200, extra: Record<string, string> = {}) =>
@@ -33,27 +33,24 @@ const isAdmin = (req: Request, env: Env) => {
   return Boolean(token && env.APP_ADMIN_TOKEN && token === env.APP_ADMIN_TOKEN);
 };
 
-// Déduction basique du content-type
 const guessType = (key: string) => {
   const ext = (key.split(".").pop() || "").toLowerCase();
   const map: Record<string, string> = {
-    json: "application/json",
-    txt: "text/plain; charset=utf-8",
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    gif: "image/gif",
-    webp: "image/webp",
-    svg: "image/svg+xml",
-    pdf: "application/pdf",
-    mp4: "video/mp4",
-    mp3: "audio/mpeg",
+    json: "application/json", txt: "text/plain; charset=utf-8",
+    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
+    gif: "image/gif", webp: "image/webp", svg: "image/svg+xml",
+    pdf: "application/pdf", mp4: "video/mp4", mp3: "audio/mpeg"
   };
   return map[ext] || "application/octet-stream";
 };
 
+function getSupabase(env: Env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE) return null;
+  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } });
+}
+
 export default {
-  async fetch(req, env): Promise<Response> {
+  async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     const { pathname, searchParams } = url;
 
@@ -65,7 +62,7 @@ export default {
       return json({ ok: true, ts: Date.now() });
     }
 
-    // 2) Assets (R2): GET/PUT /assets/:key
+    // 2) Assets (R2) - GET/PUT /assets/:key
     if (pathname.startsWith("/assets/")) {
       const key = decodeURIComponent(pathname.slice("/assets/".length));
       if (!key) return notFound();
@@ -77,7 +74,7 @@ export default {
         const headers: Record<string, string> = {
           "content-type": obj.httpMetadata?.contentType || guessType(key),
           "cache-control": "public, max-age=60",
-          ...CORS,
+          ...CORS
         };
         if (searchParams.get("download") === "1") {
           headers["content-disposition"] = `attachment; filename="${key.split("/").pop()}"`;
@@ -93,26 +90,73 @@ export default {
       }
     }
 
-    // 3) Jobs (RunPod): POST /jobs  { ...payload }
+    // 3) Jobs API
+    // 3.a) POST /jobs  -> crée un job en DB (+ appelle RunPod si configuré)
     if (req.method === "POST" && pathname === "/jobs") {
       if (!isAdmin(req, env)) return unauthorized();
-      let payload: unknown;
-      try { payload = await req.json(); } catch { payload = {}; }
+      const supabase = getSupabase(env);
+
+      let payload: any = {};
+      try { payload = await req.json(); } catch {}
+
+      // 1) on crée le job en DB (si Supabase est configuré)
+      let jobId: string | null = null;
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("jobs")
+          .insert({ status: "queued", payload, provider: env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID ? "runpod" : "noop" })
+          .select("id")
+          .single();
+        if (error) return json({ ok: false, error: error.message }, 500);
+        jobId = data.id;
+      }
+
+      // 2) on appelle RunPod si configuré, sinon "noop"
+      let provider = "noop";
+      let provider_job_id: string | null = null;
+      let result: any = null;
+      let status: string = "queued";
 
       if (env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID) {
+        provider = "runpod";
         const resp = await fetch(`https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/run`, {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            authorization: `Bearer ${env.RUNPOD_API_KEY}`,
+            authorization: `Bearer ${env.RUNPOD_API_KEY}`
           },
-          body: JSON.stringify({ input: payload }),
+          body: JSON.stringify({ input: payload })
         });
-        const data = await resp.json().catch(() => null);
-        return json({ ok: resp.ok, provider: "runpod", data }, resp.ok ? 200 : 502);
+
+        status = resp.ok ? "submitted" : "error";
+        try { result = await resp.json(); } catch { result = null; }
+        provider_job_id = (result && (result.id || result.jobId || result.job_id)) || null;
+      } else {
+        status = "submitted";
+        result = { note: "noop (configure RUNPOD_API_KEY & RUNPOD_ENDPOINT_ID to call provider)" };
       }
-      // Mode "noop" si pas de clés (pratique pour dev)
-      return json({ ok: true, provider: "noop", note: "Set RUNPOD_API_KEY & RUNPOD_ENDPOINT_ID to call RunPod.", input: payload }, 202);
+
+      // 3) on met à jour le job en DB (si Supabase)
+      if (supabase && jobId) {
+        const { error } = await supabase
+          .from("jobs")
+          .update({ status, result, provider, provider_job_id })
+          .eq("id", jobId);
+        if (error) return json({ ok: false, error: error.message }, 500);
+      }
+
+      return json({ ok: true, job_id: jobId, status, provider, provider_job_id, result }, 202);
+    }
+
+    // 3.b) GET /jobs/:id -> récupère l’état d’un job
+    if (req.method === "GET" && pathname.startsWith("/jobs/")) {
+      const jobId = pathname.split("/").pop()!;
+      const supabase = getSupabase(env);
+      if (!supabase) return json({ ok: false, error: "supabase_not_configured" }, 501);
+
+      const { data, error } = await supabase.from("jobs").select("*").eq("id", jobId).single();
+      if (error) return json({ ok: false, error: error.message }, 404);
+      return json({ ok: true, job: data });
     }
 
     // 4) Webhooks: POST /webhooks/*
@@ -121,27 +165,29 @@ export default {
         const sig = req.headers.get("x-webhook-secret");
         if (sig !== env.WEBHOOK_SECRET) return unauthorized();
       }
+      const supabase = getSupabase(env);
       const event = await req.json().catch(() => null);
-      // Ici tu peux router selon /webhooks/supabase, /webhooks/stripe, etc.
-      return json({ ok: true, path: pathname, received: event });
+
+      // Insère l'événement si DB configurée
+      if (supabase) {
+        await supabase.from("events").insert({ type: pathname.slice("/webhooks/".length), payload: event });
+      }
+      return json({ ok: true, received: event, path: pathname });
     }
 
-    // 5) Supabase: GET /me  (vérifie un token Bearer utilisateur)
+    // 5) Profil Supabase: GET /me  (vérifie un JWT utilisateur)
     if (req.method === "GET" && pathname === "/me") {
-      const urlSupabase = env.SUPABASE_URL;
-      const serviceRole = env.SUPABASE_SERVICE_ROLE;
-      if (!urlSupabase || !serviceRole) return json({ ok: false, error: "supabase_not_configured" }, 501);
+      const supabase = getSupabase(env);
+      if (!supabase) return json({ ok: false, error: "supabase_not_configured" }, 501);
 
       const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
       if (!bearer) return unauthorized();
 
-      const supabase = createClient(urlSupabase, serviceRole, { auth: { persistSession: false } });
       const { data, error } = await supabase.auth.getUser(bearer);
       if (error) return json({ ok: false, error: error.message }, 401);
       return json({ ok: true, user: data.user });
     }
 
-    // 404
     return notFound();
-  },
+  }
 } satisfies ExportedHandler<Env>;
