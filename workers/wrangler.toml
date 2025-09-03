@@ -1,18 +1,8 @@
 name = "alphogenai-worker"
 main = "src/index.ts"
-compatibility_date = "2024-09-01"
-account_id = "a3ac983a6a5ce4bb150638e1f620c2a7"   # ton Account ID CF
-tsconfig = "tsconfig.json"
+compatibility_date = "2024-09-03"
+compatibility_flags = ["nodejs_compat"]
+account_id = "a3ac983a6a5ce4bb150638e1f620c2a7"
 
-[vars]
-# (facultatif) variables d'env publiques du worker
-
-[env.staging]
-routes = [
-  { pattern = "api-staging.alphogen.com/*", zone_id = "824fa72287d21dd30f97f188f650d6b7" } # ton Zone ID CF
-]
-
-[env.prod]
-routes = [
-  { pattern = "api.alphogen.com/*", zone_id = "824fa72287d21dd30f97f188f650d6b7" }       # ton Zone ID CF
-]
+# Les secrets (APP_ADMIN_TOKEN, etc.) restent gérés dans le Dashboard CF.
+# Ne rien dupliquer ici.
