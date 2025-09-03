@@ -1,21 +1,23 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as cloudflare from "@pulumi/cloudflare";
 
-// Config requise
-const cfg = new pulumi.Config();
-const dnsZone      = cfg.require("cfDnsZone");
-const workerName   = cfg.require("cfWorkerName");
-const apiSubdomain = cfg.require("apiSubdomain"); // "api" (prod) ou "api-staging" (staging)
+const cfg = new pulumi.Config(); // namespace: le nom du projet Pulumi
+const cfAccountId  = cfg.require("cfAccountId");   // fourni par le workflow
+const cfDnsZone    = cfg.require("cfDnsZone");     // ex. alphogen.com
+const cfWorkerName = cfg.require("cfWorkerName");  // ex. alphogenai-worker
 
-// Récupère la zone Cloudflare pour créer la route Worker
-const zone = cloudflare.getZoneOutput({ name: dnsZone });
+// Route selon le stack (staging -> api-staging, prod -> api)
+const stack = pulumi.getStack();
+const routePattern = stack === "prod"
+  ? "api.alphogen.com/*"
+  : "api-staging.alphogen.com/*";
 
-// Route Worker: https://{apiSubdomain}.{dnsZone}/*
-new cloudflare.WorkerRoute("api-route", {
-  zoneId:   zone.id,
-  pattern:  pulumi.interpolate`${apiSubdomain}.${dnsZone}/*`,
-  scriptName: workerName,
+// Récupère la zone Cloudflare par nom de domaine
+const zone = cloudflare.getZoneOutput({ name: cfDnsZone });
+
+// Crée UNIQUEMENT la route du Worker vers ton script existant
+export const workerRoute = new cloudflare.WorkerRoute("api-route", {
+  zoneId: zone.id,
+  pattern: routePattern,
+  scriptName: cfWorkerName, // script déployé par Wrangler
 });
-
-// Exports utiles (logs Pulumi)
-export const apiUrl = pulumi.interpolate`https://${apiSubdomain}.${dnsZone}`;
