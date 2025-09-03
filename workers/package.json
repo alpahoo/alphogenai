@@ -1,6 +1,6 @@
 {
-  "name": "workers",
-  "version": "1.0.0",
+  "name": "alphogenai-worker",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
@@ -8,11 +8,8 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "wrangler": "^3.73.0",
     "typescript": "^5.4.0",
-    "wrangler": "^3.60.0",
-    "@cloudflare/workers-types": "^4.20240815.0"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.45.0"
+    "@cloudflare/workers-types": "^4.20240903.0"
   }
 }
