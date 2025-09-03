@@ -1,30 +1,21 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as cloudflare from "@pulumi/cloudflare";
 
+// Config requise
 const cfg = new pulumi.Config();
-const accountId      = cfg.require("cfAccountId");
-const dnsZone        = cfg.require("cfDnsZone");
-const pagesProject   = cfg.require("cfPagesProject");
-const workerName     = cfg.require("cfWorkerName");
-const apiSubdomain   = cfg.require("apiSubdomain"); // "api" en prod, "api-staging" en staging
+const dnsZone      = cfg.require("cfDnsZone");
+const workerName   = cfg.require("cfWorkerName");
+const apiSubdomain = cfg.require("apiSubdomain"); // "api" (prod) ou "api-staging" (staging)
 
-// Récupère la zone Cloudflare (pour les routes Workers)
+// Récupère la zone Cloudflare pour créer la route Worker
 const zone = cloudflare.getZoneOutput({ name: dnsZone });
-
-// 👉 IMPORTANT : on NE CRÉE PLUS le projet Pages.
-//    On le "lit" seulement par son nom ; s'il n'existe pas, Wranger (app_deploy) le créera.
-const existingPages = cloudflare.getPagesProjectOutput({
-  accountId,
-  name: pagesProject,
-});
 
 // Route Worker: https://{apiSubdomain}.{dnsZone}/*
 new cloudflare.WorkerRoute("api-route", {
-  zoneId: zone.id,
-  pattern: pulumi.interpolate`${apiSubdomain}.${dnsZone}/*`,
+  zoneId:   zone.id,
+  pattern:  pulumi.interpolate`${apiSubdomain}.${dnsZone}/*`,
   scriptName: workerName,
 });
 
-// Exports (pour logs Pulumi)
+// Exports utiles (logs Pulumi)
 export const apiUrl = pulumi.interpolate`https://${apiSubdomain}.${dnsZone}`;
-export const pagesName = existingPages.name;
