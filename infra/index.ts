@@ -1,23 +1,35 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as cloudflare from "@pulumi/cloudflare";
 
-const cfg = new pulumi.Config(); // namespace: le nom du projet Pulumi
-const cfAccountId  = cfg.require("cfAccountId");   // fourni par le workflow
-const cfDnsZone    = cfg.require("cfDnsZone");     // ex. alphogen.com
-const cfWorkerName = cfg.require("cfWorkerName");  // ex. alphogenai-worker
+const cfg = new pulumi.Config();
+const accountId  = cfg.require("cfAccountId");
+const zoneId     = cfg.require("cfZoneId");
+const workerName = cfg.get("workerName") || "alphogenai-worker";
 
-// Route selon le stack (staging -> api-staging, prod -> api)
 const stack = pulumi.getStack();
-const routePattern = stack === "prod"
-  ? "api.alphogen.com/*"
-  : "api-staging.alphogen.com/*";
 
-// Récupère la zone Cloudflare par nom de domaine
-const zone = cloudflare.getZoneOutput({ name: cfDnsZone });
+// Un pattern par stack — simple et clair
+const routePattern =
+  stack === "prod"
+    ? "api.alphogenai.com/*"
+    : "api-staging.alphogenai.com/*";
 
-// Crée UNIQUEMENT la route du Worker vers ton script existant
-export const workerRoute = new cloudflare.WorkerRoute("api-route", {
-  zoneId: zone.id,
-  pattern: routePattern,
-  scriptName: cfWorkerName, // script déployé par Wrangler
+// 1) On publie un *placeholder* de script pour que la route puisse
+//    toujours se créer (Wrangler redéploiera ensuite le vrai code).
+const script = new cloudflare.WorkersScript("worker-script", {
+  accountId,
+  name: workerName,
+  content: `export default {async fetch(){return new Response("ok",{status:200})}}`
 });
+
+// 2) Route unique -> si elle n'existe pas Pulumi la crée.
+//    (La CI supprime préventivement une éventuelle route conflictuelle.)
+const route = new cloudflare.WorkerRoute("worker-route", {
+  zoneId,
+  pattern: routePattern,
+  scriptName: workerName
+}, { dependsOn: [script] });
+
+// Expose quelques infos
+export const routeCreated = route.pattern;
+export const scriptDeployed = script.name;
