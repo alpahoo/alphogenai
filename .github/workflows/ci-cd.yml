@@ -1,4 +1,5 @@
 name: ci-cd
+
 on:
   push:
     branches: [ "main", "prod" ]
@@ -12,7 +13,6 @@ permissions:
   pull-requests: write
 
 env:
-  # Valeurs par défaut (peuvent être surchargées par env des jobs)
   NODE_VERSION: '20'
 
 jobs:
@@ -49,9 +49,8 @@ jobs:
     strategy:
       matrix:
         envname: [ staging, prod ]
-    if: |
-      (github.ref == 'refs/heads/main'  && contains('staging', matrix.envname)) ||
-      (github.ref == 'refs/heads/prod'  && contains('prod',    matrix.envname))
+    # ✅ if en une seule ligne
+    if: ${{ (github.ref == 'refs/heads/main' && matrix.envname == 'staging') || (github.ref == 'refs/heads/prod' && matrix.envname == 'prod') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -69,18 +68,17 @@ jobs:
         run: |
           pulumi stack select ${{ matrix.envname }} || pulumi stack init ${{ matrix.envname }}
 
-          pulumi config set cfAccountId    ${{ vars.CF_ACCOUNT_ID }} --stack ${{ matrix.envname }}
-          pulumi config set cfDnsZone      ${{ vars.CF_DNS_ZONE }}   --stack ${{ matrix.envname }}
+          pulumi config set cfAccountId ${{ vars.CF_ACCOUNT_ID }} --stack ${{ matrix.envname }}
+          pulumi config set cfDnsZone   ${{ vars.CF_DNS_ZONE }}   --stack ${{ matrix.envname }}
 
-          # Pages/Worker selon env
           if [ "${{ matrix.envname }}" = "prod" ]; then
-            pulumi config set cfPagesProject  ${{ vars.CF_PAGES_PROJECT_PROD }}   --stack prod
-            pulumi config set cfWorkerName    ${{ vars.CF_WORKER_NAME_PROD }}     --stack prod
-            pulumi config set apiSubdomain    api                                 --stack prod
+            pulumi config set cfPagesProject  "${{ vars.CF_PAGES_PROJECT_PROD }}"    --stack prod
+            pulumi config set cfWorkerName    "${{ vars.CF_WORKER_NAME_PROD }}"      --stack prod
+            pulumi config set apiSubdomain    "api"                                  --stack prod
           else
-            pulumi config set cfPagesProject  ${{ vars.CF_PAGES_PROJECT_STAGING }} --stack staging
-            pulumi config set cfWorkerName    ${{ vars.CF_WORKER_NAME_STAGING }}   --stack staging
-            pulumi config set apiSubdomain    api-staging                          --stack staging
+            pulumi config set cfPagesProject  "${{ vars.CF_PAGES_PROJECT_STAGING }}" --stack staging
+            pulumi config set cfWorkerName    "${{ vars.CF_WORKER_NAME_STAGING }}"   --stack staging
+            pulumi config set apiSubdomain    "api-staging"                          --stack staging
           fi
 
       - name: Pulumi up
@@ -90,15 +88,15 @@ jobs:
           stack-name: ${{ matrix.envname }}
           work-dir: infra
         env:
-          PULUMI_ACCESS_TOKEN:   ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          PULUMI_ACCESS_TOKEN:     ${{ secrets.PULUMI_ACCESS_TOKEN }}
           PULUMI_CONFIG_PASSPHRASE: ""
-          CLOUDFLARE_API_TOKEN:  ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID:         ${{ vars.CF_ACCOUNT_ID }}
-          CF_DNS_ZONE:           ${{ vars.CF_DNS_ZONE }}
-          # >> Les 3 ci-dessous ne sont utilisées qu'en lecture par ton code Pulumi
-          CF_PAGES_PROJECT:      ${{ matrix.envname == 'prod' && vars.CF_PAGES_PROJECT_PROD || vars.CF_PAGES_PROJECT_STAGING }}
-          CF_WORKER_NAME:        ${{ matrix.envname == 'prod' && vars.CF_WORKER_NAME_PROD   || vars.CF_WORKER_NAME_STAGING }}
-          API_SUBDOMAIN:         ${{ matrix.envname == 'prod' && 'api'                     || 'api-staging' }}
+          CLOUDFLARE_API_TOKEN:    ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID:           ${{ vars.CF_ACCOUNT_ID }}
+          CF_DNS_ZONE:             ${{ vars.CF_DNS_ZONE }}
+          # (les valeurs ci-dessous servent surtout à l’IaC et au logging)
+          CF_PAGES_PROJECT:        ${{ matrix.envname == 'prod' && vars.CF_PAGES_PROJECT_PROD || vars.CF_PAGES_PROJECT_STAGING }}
+          CF_WORKER_NAME:          ${{ matrix.envname == 'prod' && vars.CF_WORKER_NAME_PROD   || vars.CF_WORKER_NAME_STAGING }}
+          API_SUBDOMAIN:           ${{ matrix.envname == 'prod' && 'api'                       || 'api-staging' }}
 
   app_deploy:
     runs-on: ubuntu-latest
@@ -106,9 +104,7 @@ jobs:
     strategy:
       matrix:
         envname: [ staging, prod ]
-    if: |
-      (github.ref == 'refs/heads/main'  && contains('staging', matrix.envname)) ||
-      (github.ref == 'refs/heads/prod'  && contains('prod',    matrix.envname))
+    if: ${{ (github.ref == 'refs/heads/main' && matrix.envname == 'staging') || (github.ref == 'refs/heads/prod' && matrix.envname == 'prod') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -117,7 +113,7 @@ jobs:
       - name: Install Wrangler
         run: npm i -g wrangler
 
-      # Pages
+      # Pages (Next.js)
       - name: Install app deps (for Pages)
         working-directory: app
         run: npm ci || npm i
@@ -126,7 +122,7 @@ jobs:
         working-directory: app
         run: npm run build
 
-      # Worker
+      # Worker (Cloudflare Workers)
       - name: Install worker deps (for Worker)
         working-directory: workers
         run: npm ci || npm i
