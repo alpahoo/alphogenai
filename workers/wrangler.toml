@@ -1,0 +1,9 @@
+name = "alphogenai-worker"
+main = "src/index.ts"
+compatibility_date = "2024-06-20"
+account_id = "${CF_ACCOUNT_ID}"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "${CF_R2_BINDING}"
+bucket_name = "${CF_R2_BUCKET}"
