@@ -1,6 +1,6 @@
 name: ci-cd
 on:
-  workflow_dispatch: {}  # on l'activera sur push après avoir créé les dossiers
+  workflow_dispatch: {}  # on activera "push" après
 
 permissions:
   id-token: write
@@ -13,7 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: '20'
       - name: Install app deps (skip if folder absent)
         if: hashFiles('app/**') != ''
         working-directory: app
@@ -37,26 +38,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
-      - name: Pulumi preview (skip if folder absent)
+        with:
+          node-version: '20'
+      - name: Setup Pulumi CLI
+        uses: pulumi/setup-pulumi@v3
+
+      - name: Ensure Pulumi stack
+        if: hashFiles('infra/**') != ''
+        working-directory: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+        run: |
+          pulumi stack select staging || pulumi stack init staging
+          pulumi config set cfAccountId ${{ vars.CF_ACCOUNT_ID }} --stack staging
+          pulumi config set cfDnsZone   ${{ vars.CF_DNS_ZONE }}   --stack staging
+          pulumi config set cfR2Bucket  ${{ vars.CF_R2_BUCKET }}  --stack staging
+          pulumi config set cfWorkerName ${{ vars.CF_WORKER_NAME }} --stack staging
+          pulumi config set cfPagesProject ${{ vars.CF_PAGES_PROJECT }} --stack staging
+
+      - name: Pulumi preview
         if: hashFiles('infra/**') != ''
         uses: pulumi/actions@v4
-        with: { command: preview, stack-name: staging, work-dir: infra }
+        with:
+          command: preview
+          stack-name: staging
+          work-dir: infra
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
           PULUMI_CONFIG_PASSPHRASE: ""
-      - name: Pulumi up (skip if folder absent)
+
+      - name: Pulumi up
         if: hashFiles('infra/**') != ''
         uses: pulumi/actions@v4
-        with: { command: up, stack-name: staging, work-dir: infra }
+        with:
+          command: up
+          stack-name: staging
+          work-dir: infra
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
           PULUMI_CONFIG_PASSPHRASE: ""
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-          CF_DNS_ZONE: ${{ vars.CF_DNS_ZONE }}
-          CF_R2_BUCKET: ${{ vars.CF_R2_BUCKET }}
-          CF_WORKER_NAME: ${{ vars.CF_WORKER_NAME }}
+          CF_API_TOKEN:     ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID:    ${{ vars.CF_ACCOUNT_ID }}
+          CF_DNS_ZONE:      ${{ vars.CF_DNS_ZONE }}
+          CF_R2_BUCKET:     ${{ vars.CF_R2_BUCKET }}
+          CF_WORKER_NAME:   ${{ vars.CF_WORKER_NAME }}
           CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
 
   app_deploy:
@@ -65,7 +90,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: '20'
       - name: Install Wrangler
         run: npm i -g wrangler
       - name: Deploy Worker (skip if folder absent)
@@ -73,14 +99,14 @@ jobs:
         working-directory: workers
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_API_TOKEN:         ${{ secrets.CF_API_TOKEN }}
         run: wrangler deploy
       - name: Publish Pages (skip if folder absent)
         if: hashFiles('app/**') != ''
         working-directory: app
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_API_TOKEN:         ${{ secrets.CF_API_TOKEN }}
         run: |
           npm run build --if-present
           npx wrangler pages deploy ./out --project-name ${{ vars.CF_PAGES_PROJECT }}
