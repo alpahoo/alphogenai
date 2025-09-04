@@ -83,3 +83,4 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: a3ac983a6a5ce4bb150638e1f620c2a7
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: npx wrangler pages deploy ./out --project-name alphogen-app
+# Trigger deployment - Thu Sep  4 23:41:29 UTC 2025
