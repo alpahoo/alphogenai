@@ -87,34 +87,51 @@ async function createJobRecord(env: Env, userId: string | null, payload: any, st
   const supabase = getSupabase(env);
   if (!supabase) return null;
   
-  const { data, error } = await supabase
-    .from('jobs')
-    .insert({ user_id: userId, status, payload, result })
-    .select()
-    .single();
-  
-  if (error) throw new Error(`supabase_job_error: ${error.message}`);
-  return data;
+  try {
+    const { data, error } = await supabase
+      .from('jobs')
+      .insert({ user_id: userId, status, payload, result })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Supabase job insert error:', error);
+      return null;
+    }
+    return data;
+  } catch (e) {
+    console.error('Supabase job record creation failed:', e);
+    return null;
+  }
 }
 
 async function logEvent(env: Env, type: string, payload: any) {
   const supabase = getSupabase(env);
   if (!supabase) return null;
   
-  const { error } = await supabase
-    .from('events')
-    .insert({ type, payload });
-  
-  if (error) console.error('Event logging failed:', error);
+  try {
+    const { error } = await supabase
+      .from('events')
+      .insert({ type, payload });
+    
+    if (error) console.error('Event logging failed:', error);
+  } catch (e) {
+    console.error('Event logging exception:', e);
+  }
 }
 
 async function validateJWT(env: Env, token: string) {
   const supabase = getSupabase(env);
   if (!supabase) throw new Error("supabase_not_configured");
   
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) throw new Error(`jwt_invalid: ${error?.message || 'user not found'}`);
-  return user;
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) throw new Error(`jwt_invalid: ${error?.message || 'user not found'}`);
+    return user;
+  } catch (e: any) {
+    console.error('JWT validation error:', e);
+    throw new Error(`jwt_validation_failed: ${String(e?.message || e)}`);
+  }
 }
 
 /* ---------------- Worker ---------------- */
@@ -141,9 +158,11 @@ export default {
       try { body = await req.json(); } catch {}
       
       try {
-        const headerEntries: [string, string][] = [];
-        req.headers.forEach((value, key) => headerEntries.push([key, value]));
-        await logEvent(env, path, { body, headers: Object.fromEntries(headerEntries) });
+        const headers: Record<string, string> = {};
+        req.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+        await logEvent(env, path, { body, headers });
       } catch (e) {
         console.error('Failed to log webhook event:', e);
       }
@@ -223,29 +242,32 @@ export default {
         
         return json({ ok: true, status, provider: "runpod", provider_job_id: id, job_id: jobRecord?.id, result: rp });
       } catch (e: any) {
-        if (String(e?.message || e).includes("runpod_not_configured")) {
+        const errorMessage = String(e?.message || e);
+        console.error('Job creation error:', errorMessage);
+        
+        if (errorMessage.includes("runpod_not_configured")) {
           status = "noop";
           result = { provider: "noop", reason: "runpod_not_configured" };
           
           try {
             jobRecord = await createJobRecord(env, null, input, status, result);
-          } catch (e) {
-            console.error('Failed to create noop job record:', e);
+          } catch (dbError) {
+            console.error('Failed to create noop job record:', dbError);
           }
           
           return json({ ok: true, status: "submitted", provider: "noop", provider_job_id: null, job_id: jobRecord?.id }, 202);
         }
         
         status = "error";
-        result = { error: String(e?.message || e) };
+        result = { error: errorMessage };
         
         try {
           jobRecord = await createJobRecord(env, null, input, status, result);
-        } catch (e) {
-          console.error('Failed to create error job record:', e);
+        } catch (dbError) {
+          console.error('Failed to create error job record:', dbError);
         }
         
-        return json({ ok: false, error: String(e?.message || e), job_id: jobRecord?.id }, 500);
+        return json({ ok: false, error: errorMessage || "unknown_error", job_id: jobRecord?.id }, 500);
       }
     }
 

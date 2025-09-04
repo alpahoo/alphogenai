@@ -5,3 +5,9 @@ compatibility_date = "2025-09-03"
 [[r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "alphogenai-assets"
+
+[env.staging]
+name = "alphogenai-worker-staging"
+
+[env.prod]
+name = "alphogenai-worker"

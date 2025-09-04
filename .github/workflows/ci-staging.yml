@@ -1,7 +1,7 @@
 name: ci-staging
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "stabilize-rp-worker" ]
     paths-ignore: [ "**/*.md", ".github/ISSUE_TEMPLATE/**" ]
 
 permissions:

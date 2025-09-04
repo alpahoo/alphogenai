@@ -31,6 +31,14 @@ const route = new cloudflare.WorkerRoute("worker-route", {
   scriptName: workerName
 }, { dependsOn: [script] });
 
+const pagesProjectName = stack === "prod" ? "alphogenai-app" : "alphogenai-app-staging";
+const pagesProject = new cloudflare.PagesProject("alphogenai-app", {
+  accountId,
+  name: pagesProjectName,
+  productionBranch: stack === "prod" ? "main" : "main",
+});
+
 // Expose quelques infos
 export const routeCreated = route.pattern;
 export const scriptDeployed = script.name;
+export const pagesProjectCreated = pagesProject.name;

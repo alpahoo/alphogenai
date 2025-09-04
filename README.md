@@ -211,6 +211,8 @@ Execute these SQL commands in your Supabase SQL editor:
 
 ```sql
 create extension if not exists "uuid-ossp";
+
+-- Jobs table for tracking RunPod job submissions
 create table if not exists public.jobs (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid, 
@@ -219,16 +221,40 @@ create table if not exists public.jobs (
   result jsonb, 
   created_at timestamptz default now()
 );
+
+-- Events table for webhook and system event logging
 create table if not exists public.events (
   id bigserial primary key, 
   type text not null,
   payload jsonb, 
   created_at timestamptz default now()
 );
+
+-- Row Level Security for jobs
 alter table public.jobs enable row level security;
 create policy "job_owner_can_read" on public.jobs for select using (auth.uid() = user_id);
 create policy "job_owner_can_insert" on public.jobs for insert with check (auth.uid() = user_id);
+
+-- Allow service role to manage all records (for API operations)
+create policy "service_role_all_jobs" on public.jobs for all using (auth.role() = 'service_role');
+create policy "service_role_all_events" on public.events for all using (auth.role() = 'service_role');
 ```
+
+### Database Schema
+
+**jobs table:**
+- `id`: UUID primary key
+- `user_id`: UUID of authenticated user (nullable for admin operations)
+- `status`: Job status (`queued`, `submitted`, `noop`, `error`)
+- `payload`: Original job request data
+- `result`: Job result including provider info and response
+- `created_at`: Timestamp
+
+**events table:**
+- `id`: Auto-incrementing primary key
+- `type`: Event type (webhook path like `/webhooks/test`)
+- `payload`: Event data including headers and body
+- `created_at`: Timestamp
 
 ## Architecture
 
