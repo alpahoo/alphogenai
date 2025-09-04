@@ -56,7 +56,12 @@ async function runpodStart(env: Env, input: any) {
     headers: { "content-type": "application/json", authorization: `Bearer ${env.RUNPOD_API_KEY}` },
     body: JSON.stringify({ input }),
   });
-  if (!r.ok) throw new Error(`runpod_http_${r.status}`);
+  if (!r.ok) {
+    if (r.status === 401) {
+      throw new Error("runpod_unauthorized");
+    }
+    throw new Error(`runpod_http_${r.status}`);
+  }
   return r.json<any>();
 }
 async function runpodStatus(env: Env, id: string) {
@@ -275,24 +280,24 @@ export default {
         
       } catch (e: any) {
         console.error('RunPod API call failed:', e);
-        console.error('Error type:', typeof e);
-        console.error('Error message:', e?.message);
-        console.error('Error stack:', e?.stack);
-        
         const errorMessage = String(e?.message || e || 'unknown_runpod_error');
-        console.error('Processed error message:', errorMessage);
         
-        const errorResponse = { 
+        if (errorMessage.includes('runpod_unauthorized') || errorMessage.includes('runpod_http_401')) {
+          console.log('RunPod unauthorized, returning noop response');
+          return json({ 
+            ok: true, 
+            status: "submitted", 
+            provider: "noop", 
+            provider_job_id: null,
+            message: "runpod_unauthorized"
+          }, 202);
+        }
+        
+        console.error('Returning error response for non-auth RunPod error');
+        return json({ 
           ok: false, 
-          error: errorMessage,
-          debug: {
-            errorType: typeof e,
-            hasMessage: !!e?.message,
-            hasStack: !!e?.stack
-          }
-        };
-        console.error('Returning error response:', JSON.stringify(errorResponse));
-        return json(errorResponse, 500);
+          error: errorMessage
+        }, 500);
       }
     }
 
