@@ -175,3 +175,5 @@ jobs:
           fi
           
           echo "✅ All smoke tests passed!"
+# Trigger smoke test with GitHub secrets
+# Added comment to trigger new workflow run - Thu Sep  4 17:31:56 UTC 2025
