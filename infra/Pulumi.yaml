@@ -1,3 +1,4 @@
 name: alphogenai-infra
 runtime: nodejs
+main: dist/index.js
 description: Infra Cloudflare (script placeholder + route) pour AlphogenAI
