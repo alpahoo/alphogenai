@@ -2,7 +2,7 @@ name: ci-cd
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "stabilize-rp-worker" ]
   workflow_dispatch: {}
 
 permissions:
