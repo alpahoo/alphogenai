@@ -102,9 +102,19 @@ jobs:
           wrangler secret put RUNPOD_ENDPOINT_ID --env staging <<< "${{ secrets.RUNPOD_ENDPOINT_ID }}"
           wrangler secret put SUPABASE_URL --env staging <<< "${{ secrets.SUPABASE_URL }}"
           wrangler secret put SUPABASE_SERVICE_ROLE --env staging <<< "${{ secrets.SUPABASE_SERVICE_ROLE }}"
+          if [ -n "${{ secrets.STRIPE_SECRET_KEY }}" ]; then
+            wrangler secret put STRIPE_SECRET_KEY --env staging <<< "${{ secrets.STRIPE_SECRET_KEY }}"
+          fi
+          if [ -n "${{ secrets.STRIPE_WEBHOOK_SECRET }}" ]; then
+            wrangler secret put STRIPE_WEBHOOK_SECRET --env staging <<< "${{ secrets.STRIPE_WEBHOOK_SECRET }}"
+          fi
           wrangler deploy --env staging --name "$WORKER_NAME"
       - name: Publish Pages (staging)
         if: hashFiles('app/**') != ''
         working-directory: app
-        env: { CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }} }
+        env: 
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          NEXT_PUBLIC_API_BASE: https://api-staging.alphogen.com
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: npx wrangler pages deploy ./out --project-name "$PAGES_PROJECT_STAGING"

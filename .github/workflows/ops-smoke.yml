@@ -110,28 +110,46 @@ jobs:
             echo "job_id=skip" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          resp=$(curl -sS -X POST "$API_BASE/jobs" \
-                  -H "Authorization: Bearer $APP_ADMIN_TOKEN" \
-                  -H "Content-Type: application/json" \
-                  --data '{"prompt": "smoke test video"}')
-          echo "POST jobs response: $resp"
-          ok=$(echo "$resp" | jq -r '.ok // empty')
-          if [ "$ok" != "true" ]; then
-            echo "::error::POST /jobs failed"
-            exit 1
-          fi
-          provider=$(echo "$resp" | jq -r '.provider // empty')
-          if [ "$provider" = "noop" ]; then
-            echo "✓ POST /jobs returned noop response (RunPod secrets not configured)"
-            echo "job_id=noop" >> "$GITHUB_OUTPUT"
-          else
-            job_id=$(echo "$resp" | jq -r '.provider_job_id // empty')
-            if [ -z "$job_id" ]; then
-              echo "::error::No provider_job_id returned"
-              exit 1
+          
+          # Add retry logic and debugging for CI environment
+          for attempt in 1 2 3; do
+            echo "Attempt $attempt: Testing POST /jobs..."
+            resp=$(curl -sS -X POST "$API_BASE/jobs" \
+                    -H "Authorization: Bearer $APP_ADMIN_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    --data '{"prompt": "smoke test video"}' || echo '{"ok":false,"error":"curl_failed"}')
+            echo "POST jobs response (attempt $attempt): $resp"
+            
+            # Check if response is valid JSON
+            if ! echo "$resp" | jq . >/dev/null 2>&1; then
+              echo "⚠ Invalid JSON response, retrying..."
+              sleep 2
+              continue
             fi
-            echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
-          fi
+            
+            ok=$(echo "$resp" | jq -r '.ok // empty')
+            if [ "$ok" = "true" ]; then
+              provider=$(echo "$resp" | jq -r '.provider // empty')
+              if [ "$provider" = "noop" ]; then
+                echo "✓ POST /jobs returned noop response (RunPod secrets not configured)"
+                echo "job_id=noop" >> "$GITHUB_OUTPUT"
+              else
+                job_id=$(echo "$resp" | jq -r '.provider_job_id // empty')
+                if [ -z "$job_id" ]; then
+                  echo "::error::No provider_job_id returned"
+                  exit 1
+                fi
+                echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
+              fi
+              break
+            elif [ "$attempt" -eq 3 ]; then
+              echo "::error::POST /jobs failed after 3 attempts. Final response: $resp"
+              exit 1
+            else
+              echo "⚠ Attempt $attempt failed, retrying in 2 seconds..."
+              sleep 2
+            fi
+          done
 
       - name: Test GET /jobs/:id (Runpod proxy)
         env:
@@ -191,5 +209,68 @@ jobs:
           fi
           
           echo "✅ All smoke tests passed!"
-# Trigger smoke test with GitHub secrets
-# Added comment to trigger new workflow run - Thu Sep  4 17:31:56 UTC 2025
+
+      - name: Test POST /billing/checkout (Stripe integration)
+        env:
+          APP_ADMIN_TOKEN: ${{ secrets.APP_ADMIN_TOKEN }}
+        run: |
+          if [ -z "$APP_ADMIN_TOKEN" ]; then
+            echo "⚠ Skipping billing test - APP_ADMIN_TOKEN not available"
+            exit 0
+          fi
+          
+          resp=$(curl -sS -X POST "$API_BASE/billing/checkout" \
+                  -H "Authorization: Bearer $APP_ADMIN_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  --data '{"price_id": "price_test", "success_url": "https://example.com/success", "cancel_url": "https://example.com/cancel"}')
+          echo "POST billing/checkout response: $resp"
+          
+          ok=$(echo "$resp" | jq -r '.ok // empty')
+          if [ "$ok" != "true" ]; then
+            echo "::error::POST /billing/checkout failed"
+            exit 1
+          fi
+          
+          provider=$(echo "$resp" | jq -r '.provider // empty')
+          if [ "$provider" = "noop" ]; then
+            echo "✓ POST /billing/checkout returned noop response (Stripe not configured)"
+          else
+            checkout_url=$(echo "$resp" | jq -r '.checkout_url // empty')
+            if [ -z "$checkout_url" ] || ! echo "$checkout_url" | grep -q "checkout.stripe.com"; then
+              echo "::error::Invalid checkout URL returned: $checkout_url"
+              exit 1
+            fi
+            echo "✓ POST /billing/checkout returned valid Stripe checkout URL"
+          fi
+
+      - name: Test POST /webhooks/stripe (Stripe webhook)
+        run: |
+          # Test with minimal webhook payload
+          resp=$(curl -sS -X POST "$API_BASE/webhooks/stripe" \
+                  -H "stripe-signature: t=1234567890,v1=test_signature" \
+                  -H "Content-Type: application/json" \
+                  --data '{"type": "test.event", "data": {"object": {}}}')
+          echo "POST webhooks/stripe response: $resp"
+          
+          ok=$(echo "$resp" | jq -r '.ok // empty')
+          if [ "$ok" != "true" ]; then
+            echo "::error::POST /webhooks/stripe failed"
+            exit 1
+          fi
+          
+          provider=$(echo "$resp" | jq -r '.provider // empty')
+          if [ "$provider" = "noop" ]; then
+            echo "✓ POST /webhooks/stripe returned noop response (Stripe webhook not configured)"
+          else
+            # For real webhook, we expect signature validation to fail with test data
+            error=$(echo "$resp" | jq -r '.error // empty')
+            if echo "$error" | grep -q "signature"; then
+              echo "✓ POST /webhooks/stripe signature validation working (expected failure with test data)"
+            else
+              echo "::error::Unexpected webhook response: $resp"
+              exit 1
+            fi
+          fi
+
+# Trigger smoke test with GitHub secrets and billing endpoints
+# Added comment to trigger new workflow run - Thu Sep  4 21:14:51 UTC 2025

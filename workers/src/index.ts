@@ -9,6 +9,9 @@ export interface Env {
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE?: string;
 
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+
   R2_BUCKET?: R2Bucket;
 }
 
@@ -21,7 +24,7 @@ const VERSION = "rp-only-" + new Date(Date.UTC(2025, 8, 4, 0, 0, 0)).toISOString
 /* ---------------- utils ---------------- */
 const cors = () => ({
   "access-control-allow-origin": "*",
-  "access-control-allow-headers": "authorization,content-type,x-webhook-secret",
+  "access-control-allow-headers": "authorization,content-type,x-webhook-secret,stripe-signature",
   "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
 });
 const json = (data: JSONValue, status = 200) =>
@@ -331,6 +334,182 @@ export default {
           return json({ ok: true, provider: "noop", message: "supabase_not_configured" }, 501);
         }
         return json({ ok: false, error: String(e?.message || e) }, 401);
+      }
+    }
+
+    if (req.method === "POST" && path === "/billing/checkout") {
+      if (!env.STRIPE_SECRET_KEY) {
+        return json({
+          ok: true,
+          provider: "noop",
+          message: "stripe_not_configured"
+        }, 202);
+      }
+
+      const authHeader = req.headers.get("authorization") || "";
+      const tokenMatch = /^bearer\s+(.+)$/i.exec(authHeader);
+      
+      if (!tokenMatch) {
+        return json({ ok: false, error: "missing_authorization" }, 401);
+      }
+
+      const token = tokenMatch[1];
+      
+      if (token !== env.APP_ADMIN_TOKEN) {
+        if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE) {
+          return json({ ok: false, error: "authentication_required" }, 401);
+        }
+
+        try {
+          const user = await validateJWT(env, token);
+          if (!user) {
+            return json({ ok: false, error: "jwt_invalid" }, 401);
+          }
+        } catch (e: any) {
+          return json({ ok: false, error: "authentication_error" }, 401);
+        }
+      }
+
+      try {
+        let payload: any = {};
+        try { 
+          payload = await req.json();
+        } catch (e) {
+          return json({ ok: false, error: "json_parse_error" }, 400);
+        }
+        
+        const checkoutData = {
+          mode: 'subscription',
+          line_items: [{
+            price: payload.price_id || 'price_default',
+            quantity: 1,
+          }],
+          success_url: payload.success_url || 'https://alphogenai-app.pages.dev/billing?success=true',
+          cancel_url: payload.cancel_url || 'https://alphogenai-app.pages.dev/billing?canceled=true',
+        };
+
+        const stripeResponse = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${env.STRIPE_SECRET_KEY}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            'mode': checkoutData.mode,
+            'line_items[0][price]': checkoutData.line_items[0].price,
+            'line_items[0][quantity]': checkoutData.line_items[0].quantity.toString(),
+            'success_url': checkoutData.success_url,
+            'cancel_url': checkoutData.cancel_url,
+          }),
+        });
+
+        if (!stripeResponse.ok) {
+          const errorText = await stripeResponse.text();
+          return json({ ok: false, error: 'stripe_error', details: errorText }, 500);
+        }
+
+        const session = await stripeResponse.json() as any;
+        return json({
+          ok: true,
+          checkout_url: session.url,
+          session_id: session.id
+        });
+
+      } catch (e: any) {
+        return json({ ok: false, error: 'billing_error', details: String(e?.message || e) }, 500);
+      }
+    }
+
+    if (req.method === "POST" && path === "/webhooks/stripe") {
+      if (!env.STRIPE_WEBHOOK_SECRET) {
+        return json({
+          ok: true,
+          provider: "noop",
+          message: "stripe_webhook_not_configured"
+        }, 202);
+      }
+
+      const signature = req.headers.get('stripe-signature');
+      if (!signature) {
+        return json({ ok: false, error: 'missing_signature' }, 400);
+      }
+
+      try {
+        const body = await req.text();
+        
+        const elements = signature.split(',');
+        const signatureElements: Record<string, string> = {};
+        
+        for (const element of elements) {
+          const [key, value] = element.split('=');
+          if (key && value) {
+            signatureElements[key] = value;
+          }
+        }
+
+        const timestamp = signatureElements.t;
+        const expectedSignature = signatureElements.v1;
+
+        if (!timestamp || !expectedSignature) {
+          return json({ ok: false, error: 'invalid_signature_format' }, 400);
+        }
+
+        const payload = `${timestamp}.${body}`;
+        const encoder = new TextEncoder();
+        const key = await crypto.subtle.importKey(
+          'raw',
+          encoder.encode(env.STRIPE_WEBHOOK_SECRET),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        
+        const signature_bytes = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+        const signature_hex = Array.from(new Uint8Array(signature_bytes))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+
+        if (signature_hex !== expectedSignature) {
+          return json({ ok: false, error: 'signature_mismatch' }, 400);
+        }
+
+        const event = JSON.parse(body);
+        
+        if (env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE) {
+          if (event.type === 'checkout.session.completed' || 
+              event.type === 'customer.subscription.updated' ||
+              event.type === 'customer.subscription.deleted') {
+            
+            const subscription = event.data.object;
+            const customerId = subscription.customer;
+            const status = subscription.status || 'active';
+            
+            await fetch(`${env.SUPABASE_URL}/rest/v1/user_subscriptions`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE}`,
+                'apikey': env.SUPABASE_SERVICE_ROLE,
+                'Content-Type': 'application/json',
+                'Prefer': 'resolution=merge-duplicates'
+              },
+              body: JSON.stringify({
+                customer_id: customerId,
+                status: status,
+                subscription_id: subscription.id,
+                updated_at: new Date().toISOString()
+              })
+            });
+          }
+        }
+
+        return json({
+          ok: true,
+          event_type: event.type,
+          processed: true
+        });
+
+      } catch (e: any) {
+        return json({ ok: false, error: 'webhook_processing_error', details: String(e?.message || e) }, 500);
       }
     }
 
