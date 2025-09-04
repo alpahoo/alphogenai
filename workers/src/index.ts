@@ -217,67 +217,82 @@ export default {
       return json({ ok: false, error: "method_not_allowed" }, 405);
     }
 
-    // --- Aliases "rp/*" pour éviter toute collision avec d'anciens /jobs ---
     if (req.method === "POST" && (path === "/rp/start" || path === "/jobs")) {
-      if (!isAdmin(req, env)) return unauthorized();
+      console.log('POST /jobs endpoint called');
+      
+      if (!isAdmin(req, env)) {
+        console.log('Authorization failed for POST /jobs');
+        return unauthorized();
+      }
+      console.log('Authorization passed for POST /jobs');
       
       let payload: any = {};
       try { 
-        payload = await req.json(); 
+        const rawBody = await req.text();
+        console.log('Raw request body:', rawBody);
+        payload = JSON.parse(rawBody);
+        console.log('Parsed payload:', JSON.stringify(payload));
       } catch (e) {
-        console.error('Failed to parse JSON payload:', e);
-        return json({ ok: false, error: "invalid_json" }, 400);
+        console.error('JSON parsing failed:', e);
+        return json({ ok: false, error: `json_parse_error: ${String(e)}` }, 400);
       }
       
       const input = { prompt: payload.prompt ?? "", ...payload };
+      console.log('Job input prepared:', JSON.stringify(input));
       
-      let jobRecord = null;
-      let status = "queued";
-      let result = null;
+      console.log('Checking RunPod configuration...');
+      console.log('RUNPOD_API_KEY present:', !!env.RUNPOD_API_KEY);
+      console.log('RUNPOD_ENDPOINT_ID present:', !!env.RUNPOD_ENDPOINT_ID);
+      
+      if (!env.RUNPOD_API_KEY || !env.RUNPOD_ENDPOINT_ID) {
+        console.log('RunPod not configured, returning noop response');
+        return json({ 
+          ok: true, 
+          status: "submitted", 
+          provider: "noop", 
+          provider_job_id: null,
+          message: "runpod_not_configured"
+        }, 202);
+      }
       
       try {
+        console.log('Attempting RunPod API call...');
         const rp = await runpodStart(env, input);
+        console.log('RunPod response received:', JSON.stringify(rp));
+        
         const id = rp.id || rp.jobId || rp.requestId || null;
-        status = "submitted";
-        result = { provider: "runpod", provider_job_id: id, runpod_response: rp };
+        console.log('Extracted job ID:', id);
         
-        try {
-          // jobRecord = await createJobRecord(env, null, input, status, result);
-          console.log('Skipping job record creation for debugging');
-        } catch (e) {
-          console.error('Failed to create job record:', e);
-        }
+        const response = { 
+          ok: true, 
+          status: "submitted", 
+          provider: "runpod", 
+          provider_job_id: id, 
+          result: rp 
+        };
+        console.log('Returning success response:', JSON.stringify(response));
+        return json(response);
         
-        return json({ ok: true, status, provider: "runpod", provider_job_id: id, result: rp });
       } catch (e: any) {
-        const errorMessage = String(e?.message || e);
-        console.error('Job creation error:', errorMessage);
+        console.error('RunPod API call failed:', e);
+        console.error('Error type:', typeof e);
+        console.error('Error message:', e?.message);
+        console.error('Error stack:', e?.stack);
         
-        if (errorMessage.includes("runpod_not_configured")) {
-          status = "noop";
-          result = { provider: "noop", reason: "runpod_not_configured" };
-          
-          try {
-            // jobRecord = await createJobRecord(env, null, input, status, result);
-            console.log('Skipping noop job record creation for debugging');
-          } catch (dbError) {
-            console.error('Failed to create noop job record:', dbError);
+        const errorMessage = String(e?.message || e || 'unknown_runpod_error');
+        console.error('Processed error message:', errorMessage);
+        
+        const errorResponse = { 
+          ok: false, 
+          error: errorMessage,
+          debug: {
+            errorType: typeof e,
+            hasMessage: !!e?.message,
+            hasStack: !!e?.stack
           }
-          
-          return json({ ok: true, status: "submitted", provider: "noop", provider_job_id: null }, 202);
-        }
-        
-        status = "error";
-        result = { error: errorMessage };
-        
-        try {
-          // jobRecord = await createJobRecord(env, null, input, status, result);
-          console.log('Skipping error job record creation for debugging');
-        } catch (dbError) {
-          console.error('Failed to create error job record:', dbError);
-        }
-        
-        return json({ ok: false, error: errorMessage || "unknown_error" }, 500);
+        };
+        console.error('Returning error response:', JSON.stringify(errorResponse));
+        return json(errorResponse, 500);
       }
     }
 
