@@ -10,6 +10,7 @@ permissions:
 
 env:
   NODE_VERSION: '20'
+  WORKER_NAME: alphogenai-worker
 
 jobs:
   test_build:
@@ -43,9 +44,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Wrangler
-        run: npm i -g wrangler@3
+        run: npm i -g wrangler
+
+      - name: Ensure worker deps
+        if: hashFiles('workers/**') != ''
+        working-directory: workers
+        run: npm ci || npm i
 
       - name: Deploy Worker (no route changes)
+        if: hashFiles('workers/**') != ''
         working-directory: workers
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
@@ -54,7 +61,7 @@ jobs:
           wrangler secret put WEBHOOK_SECRET <<< "${{ secrets.WEBHOOK_SECRET }}"
           wrangler secret put RUNPOD_API_KEY <<< "${{ secrets.RUNPOD_API_KEY }}"
           wrangler secret put RUNPOD_ENDPOINT_ID <<< "${{ secrets.RUNPOD_ENDPOINT_ID }}"
-          wrangler deploy --minify
+          wrangler deploy --minify --name "$WORKER_NAME"
 
   pages_deploy:
     runs-on: ubuntu-latest
