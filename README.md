@@ -6,8 +6,10 @@ AlphoGenAI est un SaaS de génération de vidéos IA utilisant Cloudflare Worker
 
 | Environment | Branch | API URL | Pages URL | Pulumi Stack |
 |-------------|--------|---------|-----------|--------------|
-| Staging | `main` | https://api-staging.alphogen.com | https://alphogenai-app-staging.pages.dev | staging |
+| Staging | `main` | https://api-staging.alphogen.com (pending deployment) | https://alphogenai-app-staging.pages.dev | staging |
 | Production | `prod` | https://api.alphogen.com | https://alphogenai-app.pages.dev | prod |
+
+**Note**: Currently testing against production API (api.alphogen.com) until staging infrastructure is deployed.
 
 ## API Endpoints
 
