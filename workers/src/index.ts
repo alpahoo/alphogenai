@@ -220,8 +220,15 @@ export default {
     // --- Aliases "rp/*" pour éviter toute collision avec d'anciens /jobs ---
     if (req.method === "POST" && (path === "/rp/start" || path === "/jobs")) {
       if (!isAdmin(req, env)) return unauthorized();
+      
       let payload: any = {};
-      try { payload = await req.json(); } catch {}
+      try { 
+        payload = await req.json(); 
+      } catch (e) {
+        console.error('Failed to parse JSON payload:', e);
+        return json({ ok: false, error: "invalid_json" }, 400);
+      }
+      
       const input = { prompt: payload.prompt ?? "", ...payload };
       
       let jobRecord = null;
@@ -235,12 +242,13 @@ export default {
         result = { provider: "runpod", provider_job_id: id, runpod_response: rp };
         
         try {
-          jobRecord = await createJobRecord(env, null, input, status, result);
+          // jobRecord = await createJobRecord(env, null, input, status, result);
+          console.log('Skipping job record creation for debugging');
         } catch (e) {
           console.error('Failed to create job record:', e);
         }
         
-        return json({ ok: true, status, provider: "runpod", provider_job_id: id, job_id: jobRecord?.id, result: rp });
+        return json({ ok: true, status, provider: "runpod", provider_job_id: id, result: rp });
       } catch (e: any) {
         const errorMessage = String(e?.message || e);
         console.error('Job creation error:', errorMessage);
@@ -250,24 +258,26 @@ export default {
           result = { provider: "noop", reason: "runpod_not_configured" };
           
           try {
-            jobRecord = await createJobRecord(env, null, input, status, result);
+            // jobRecord = await createJobRecord(env, null, input, status, result);
+            console.log('Skipping noop job record creation for debugging');
           } catch (dbError) {
             console.error('Failed to create noop job record:', dbError);
           }
           
-          return json({ ok: true, status: "submitted", provider: "noop", provider_job_id: null, job_id: jobRecord?.id }, 202);
+          return json({ ok: true, status: "submitted", provider: "noop", provider_job_id: null }, 202);
         }
         
         status = "error";
         result = { error: errorMessage };
         
         try {
-          jobRecord = await createJobRecord(env, null, input, status, result);
+          // jobRecord = await createJobRecord(env, null, input, status, result);
+          console.log('Skipping error job record creation for debugging');
         } catch (dbError) {
           console.error('Failed to create error job record:', dbError);
         }
         
-        return json({ ok: false, error: errorMessage || "unknown_error", job_id: jobRecord?.id }, 500);
+        return json({ ok: false, error: errorMessage || "unknown_error" }, 500);
       }
     }
 
