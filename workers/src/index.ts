@@ -56,22 +56,16 @@ async function runpodStart(env: Env, input: any) {
     body: JSON.stringify({ input }),
   });
   if (!r.ok) throw new Error(`runpod_http_${r.status}`);
-  return r.json<any>();
+  return r.json();
 }
 async function runpodStatus(env: Env, id: string) {
   const base = runpodBase(env);
   if (!base || !env.RUNPOD_API_KEY) throw new Error("runpod_not_configured");
-  let r = await fetch(`${base}/status/${encodeURIComponent(id)}`, {
-    method: "POST",
+  const r = await fetch(`${base}/status/${encodeURIComponent(id)}`, {
     headers: { authorization: `Bearer ${env.RUNPOD_API_KEY}` },
   });
-  if (r.status === 404) {
-    r = await fetch(`${base}/status/${encodeURIComponent(id)}`, {
-      headers: { authorization: `Bearer ${env.RUNPOD_API_KEY}` },
-    });
-  }
   if (!r.ok) throw new Error(`runpod_http_${r.status}`);
-  return r.json<any>();
+  return r.json();
 }
 
 /* ---------------- Worker ---------------- */
