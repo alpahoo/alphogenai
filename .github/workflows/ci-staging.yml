@@ -95,7 +95,12 @@ jobs:
         if: hashFiles('workers/**') != ''
         working-directory: workers
         env: { CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }} }
-        run: wrangler deploy --env staging --name "$WORKER_NAME"
+        run: |
+          wrangler secret put APP_ADMIN_TOKEN --env staging <<< "${{ secrets.APP_ADMIN_TOKEN }}"
+          wrangler secret put WEBHOOK_SECRET --env staging <<< "${{ secrets.WEBHOOK_SECRET }}"
+          wrangler secret put RUNPOD_API_KEY --env staging <<< "${{ secrets.RUNPOD_API_KEY }}"
+          wrangler secret put RUNPOD_ENDPOINT_ID --env staging <<< "${{ secrets.RUNPOD_ENDPOINT_ID }}"
+          wrangler deploy --env staging --name "$WORKER_NAME"
       - name: Publish Pages (staging)
         if: hashFiles('app/**') != ''
         working-directory: app

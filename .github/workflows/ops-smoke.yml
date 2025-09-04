@@ -1,0 +1,129 @@
+name: API Smoke Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, stabilize-rp-worker]
+
+permissions:
+  contents: read
+
+env:
+  API_BASE: https://api.alphogen.com
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure jq is available
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y && sudo apt-get install -y jq
+          fi
+
+      - name: Check required secrets
+        run: |
+          miss=0
+          for v in APP_ADMIN_TOKEN WEBHOOK_SECRET RUNPOD_API_KEY RUNPOD_ENDPOINT_ID; do
+            if [ -z "${{ secrets[v] }}" ]; then
+              echo "::error::Missing secret: $v"
+              miss=1
+            fi
+          done
+          [ "$miss" -eq 0 ]
+
+      - name: Test GET /health
+        run: |
+          resp=$(curl -sS "$API_BASE/health")
+          echo "Health response: $resp"
+          ok=$(echo "$resp" | jq -r '.ok // empty')
+          if [ "$ok" != "true" ]; then
+            echo "::error::/health endpoint failed"
+            exit 1
+          fi
+
+      - name: Test POST /webhooks/test
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          resp=$(curl -sS -X POST "$API_BASE/webhooks/test" \
+                  -H "X-Webhook-Secret: $WEBHOOK_SECRET" \
+                  -H "Content-Type: application/json" \
+                  --data '{"test": true}')
+          echo "Webhook response: $resp"
+          ok=$(echo "$resp" | jq -r '.ok // empty')
+          if [ "$ok" != "true" ]; then
+            echo "::error::/webhooks/test endpoint failed"
+            exit 1
+          fi
+
+      - name: Test PUT/GET /assets
+        env:
+          APP_ADMIN_TOKEN: ${{ secrets.APP_ADMIN_TOKEN }}
+        run: |
+          # PUT asset
+          resp=$(curl -sS -X PUT "$API_BASE/assets/hello.txt" \
+                  -H "Authorization: Bearer $APP_ADMIN_TOKEN" \
+                  -H "Content-Type: text/plain" \
+                  --data "Hello World Test")
+          echo "PUT asset response: $resp"
+          ok=$(echo "$resp" | jq -r '.ok // empty')
+          if [ "$ok" != "true" ]; then
+            echo "::error::PUT /assets failed"
+            exit 1
+          fi
+          
+          # GET asset
+          content=$(curl -sS "$API_BASE/assets/hello.txt")
+          echo "GET asset content: $content"
+          if [ "$content" != "Hello World Test" ]; then
+            echo "::error::GET /assets content mismatch"
+            exit 1
+          fi
+
+      - name: Test POST /jobs
+        id: create_job
+        env:
+          APP_ADMIN_TOKEN: ${{ secrets.APP_ADMIN_TOKEN }}
+        run: |
+          resp=$(curl -sS -X POST "$API_BASE/jobs" \
+                  -H "Authorization: Bearer $APP_ADMIN_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  --data '{"prompt": "smoke test video"}')
+          echo "POST jobs response: $resp"
+          ok=$(echo "$resp" | jq -r '.ok // empty')
+          if [ "$ok" != "true" ]; then
+            echo "::error::POST /jobs failed"
+            exit 1
+          fi
+          job_id=$(echo "$resp" | jq -r '.provider_job_id // empty')
+          if [ -z "$job_id" ]; then
+            echo "::error::No provider_job_id returned"
+            exit 1
+          fi
+          echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
+
+      - name: Test GET /jobs/:id (Runpod proxy)
+        env:
+          APP_ADMIN_TOKEN: ${{ secrets.APP_ADMIN_TOKEN }}
+        run: |
+          job_id="${{ steps.create_job.outputs.job_id }}"
+          resp=$(curl -sS "$API_BASE/jobs/$job_id" \
+                  -H "Authorization: Bearer $APP_ADMIN_TOKEN")
+          echo "GET jobs status response: $resp"
+          
+          # Check no supabase_not_configured error
+          if echo "$resp" | grep -q "supabase_not_configured"; then
+            echo "::error::GET /jobs/:id still returns supabase_not_configured"
+            exit 1
+          fi
+          
+          # Check it's a valid response with Runpod data
+          ok=$(echo "$resp" | jq -r '.ok // empty')
+          provider=$(echo "$resp" | jq -r '.provider // empty')
+          if [ "$ok" != "true" ] || [ "$provider" != "runpod" ]; then
+            echo "::error::GET /jobs/:id invalid response format"
+            exit 1
+          fi
+          
+          echo "✅ All smoke tests passed!"
