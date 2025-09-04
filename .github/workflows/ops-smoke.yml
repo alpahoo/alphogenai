@@ -24,12 +24,22 @@ jobs:
       - name: Check required secrets
         run: |
           miss=0
-          for v in APP_ADMIN_TOKEN WEBHOOK_SECRET RUNPOD_API_KEY RUNPOD_ENDPOINT_ID; do
-            if [ -z "${{ secrets[v] }}" ]; then
-              echo "::error::Missing secret: $v"
-              miss=1
-            fi
-          done
+          if [ -z "${{ secrets.APP_ADMIN_TOKEN }}" ]; then
+            echo "::error::Missing secret: APP_ADMIN_TOKEN"
+            miss=1
+          fi
+          if [ -z "${{ secrets.WEBHOOK_SECRET }}" ]; then
+            echo "::error::Missing secret: WEBHOOK_SECRET"
+            miss=1
+          fi
+          if [ -z "${{ secrets.RUNPOD_API_KEY }}" ]; then
+            echo "::error::Missing secret: RUNPOD_API_KEY"
+            miss=1
+          fi
+          if [ -z "${{ secrets.RUNPOD_ENDPOINT_ID }}" ]; then
+            echo "::error::Missing secret: RUNPOD_ENDPOINT_ID"
+            miss=1
+          fi
           [ "$miss" -eq 0 ]
 
       - name: Test GET /health
