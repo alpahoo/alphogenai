@@ -2,7 +2,7 @@ name: deploy
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "stabilize-rp-worker" ]
   workflow_dispatch: {}
 
 permissions:
@@ -49,7 +49,12 @@ jobs:
         working-directory: workers
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-        run: wrangler deploy --minify
+        run: |
+          wrangler secret put APP_ADMIN_TOKEN <<< "${{ secrets.APP_ADMIN_TOKEN }}"
+          wrangler secret put WEBHOOK_SECRET <<< "${{ secrets.WEBHOOK_SECRET }}"
+          wrangler secret put RUNPOD_API_KEY <<< "${{ secrets.RUNPOD_API_KEY }}"
+          wrangler secret put RUNPOD_ENDPOINT_ID <<< "${{ secrets.RUNPOD_ENDPOINT_ID }}"
+          wrangler deploy --minify
 
   pages_deploy:
     runs-on: ubuntu-latest
