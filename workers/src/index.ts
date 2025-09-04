@@ -169,7 +169,15 @@ export default {
       return json({ ok: true, service: "worker", version: VERSION });
     }
 
-    // Webhooks (protégés par X-Webhook-Secret)
+    if (req.method === "POST" && path === "/webhooks/stripe") {
+      return json({
+        ok: true,
+        provider: "noop",
+        message: "stripe_not_configured"
+      }, 202);
+    }
+
+    // Other webhooks (protégés par X-Webhook-Secret)
     if (path.startsWith("/webhooks/")) {
       if (!isWebhook(req, env)) return unauthorized();
       let body: any = null;
@@ -438,13 +446,6 @@ export default {
       }
     }
 
-    if (req.method === "POST" && path === "/webhooks/stripe") {
-      return json({
-        ok: true,
-        provider: "noop",
-        message: "stripe_not_configured"
-      }, 202);
-    }
 
     return notFound();
   },
