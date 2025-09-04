@@ -100,6 +100,8 @@ jobs:
           wrangler secret put WEBHOOK_SECRET --env staging <<< "${{ secrets.WEBHOOK_SECRET }}"
           wrangler secret put RUNPOD_API_KEY --env staging <<< "${{ secrets.RUNPOD_API_KEY }}"
           wrangler secret put RUNPOD_ENDPOINT_ID --env staging <<< "${{ secrets.RUNPOD_ENDPOINT_ID }}"
+          wrangler secret put SUPABASE_URL --env staging <<< "${{ secrets.SUPABASE_URL }}"
+          wrangler secret put SUPABASE_SERVICE_ROLE --env staging <<< "${{ secrets.SUPABASE_SERVICE_ROLE }}"
           wrangler deploy --env staging --name "$WORKER_NAME"
       - name: Publish Pages (staging)
         if: hashFiles('app/**') != ''

@@ -6,9 +6,10 @@ export interface Env {
   RUNPOD_ENDPOINT_ID?: string; // si tu utilises l'API v2 par endpoint
   RUNPOD_API_URL?: string;     // ou bien URL complète (prioritaire si défini)
 
-  ASSETS?: R2Bucket;
-  R2?: R2Bucket;
-  BUCKET?: R2Bucket;
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE?: string;
+
+  R2_BUCKET?: R2Bucket;
 }
 
 type JSONValue =
@@ -39,7 +40,7 @@ const isAdmin = (req: Request, env: Env) => {
 const isWebhook = (req: Request, env: Env) =>
   (req.headers.get("x-webhook-secret") || "") === env.WEBHOOK_SECRET;
 
-const getR2 = (env: Env) => env.ASSETS || env.R2 || env.BUCKET;
+const getR2 = (env: Env) => env.R2_BUCKET;
 
 /* ------------- RunPod helpers ------------- */
 function runpodBase(env: Env) {
@@ -74,6 +75,48 @@ async function runpodStatus(env: Env, id: string) {
   return r.json<any>();
 }
 
+/* ------------- Supabase helpers ------------- */
+import { createClient } from '@supabase/supabase-js';
+
+function getSupabase(env: Env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE) return null;
+  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE);
+}
+
+async function createJobRecord(env: Env, userId: string | null, payload: any, status: string, result?: any) {
+  const supabase = getSupabase(env);
+  if (!supabase) return null;
+  
+  const { data, error } = await supabase
+    .from('jobs')
+    .insert({ user_id: userId, status, payload, result })
+    .select()
+    .single();
+  
+  if (error) throw new Error(`supabase_job_error: ${error.message}`);
+  return data;
+}
+
+async function logEvent(env: Env, type: string, payload: any) {
+  const supabase = getSupabase(env);
+  if (!supabase) return null;
+  
+  const { error } = await supabase
+    .from('events')
+    .insert({ type, payload });
+  
+  if (error) console.error('Event logging failed:', error);
+}
+
+async function validateJWT(env: Env, token: string) {
+  const supabase = getSupabase(env);
+  if (!supabase) throw new Error("supabase_not_configured");
+  
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) throw new Error(`jwt_invalid: ${error?.message || 'user not found'}`);
+  return user;
+}
+
 /* ---------------- Worker ---------------- */
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -96,6 +139,15 @@ export default {
       if (!isWebhook(req, env)) return unauthorized();
       let body: any = null;
       try { body = await req.json(); } catch {}
+      
+      try {
+        const headerEntries: [string, string][] = [];
+        req.headers.forEach((value, key) => headerEntries.push([key, value]));
+        await logEvent(env, path, { body, headers: Object.fromEntries(headerEntries) });
+      } catch (e) {
+        console.error('Failed to log webhook event:', e);
+      }
+      
       return json({ ok: true, path, received: body });
     }
 
@@ -116,9 +168,32 @@ export default {
       if (req.method === "GET") {
         const obj = await r2.get(key);
         if (!obj) return notFound();
-        return new Response(obj.body, {
-          headers: { "content-type": obj.httpMetadata?.contentType ?? "application/octet-stream", ...cors() },
-        });
+        
+        let contentType = obj.httpMetadata?.contentType ?? "application/octet-stream";
+        if (contentType === "application/octet-stream") {
+          const ext = key.split('.').pop()?.toLowerCase();
+          if (ext === 'txt') contentType = 'text/plain';
+          else if (ext === 'json') contentType = 'application/json';
+          else if (ext === 'html') contentType = 'text/html';
+          else if (ext === 'css') contentType = 'text/css';
+          else if (ext === 'js') contentType = 'application/javascript';
+          else if (ext === 'png') contentType = 'image/png';
+          else if (ext === 'jpg' || ext === 'jpeg') contentType = 'image/jpeg';
+          else if (ext === 'gif') contentType = 'image/gif';
+          else if (ext === 'pdf') contentType = 'application/pdf';
+        }
+        
+        const headers: Record<string, string> = {
+          "content-type": contentType,
+          "cache-control": "public, max-age=60",
+          ...cors()
+        };
+        
+        if (url.searchParams.get('download') === '1') {
+          headers['content-disposition'] = `attachment; filename="${key}"`;
+        }
+        
+        return new Response(obj.body, { headers });
       }
       return json({ ok: false, error: "method_not_allowed" }, 405);
     }
@@ -129,15 +204,48 @@ export default {
       let payload: any = {};
       try { payload = await req.json(); } catch {}
       const input = { prompt: payload.prompt ?? "", ...payload };
+      
+      let jobRecord = null;
+      let status = "queued";
+      let result = null;
+      
       try {
         const rp = await runpodStart(env, input);
         const id = rp.id || rp.jobId || rp.requestId || null;
-        return json({ ok: true, status: "submitted", provider: "runpod", provider_job_id: id, result: rp });
+        status = "submitted";
+        result = { provider: "runpod", provider_job_id: id, runpod_response: rp };
+        
+        try {
+          jobRecord = await createJobRecord(env, null, input, status, result);
+        } catch (e) {
+          console.error('Failed to create job record:', e);
+        }
+        
+        return json({ ok: true, status, provider: "runpod", provider_job_id: id, job_id: jobRecord?.id, result: rp });
       } catch (e: any) {
         if (String(e?.message || e).includes("runpod_not_configured")) {
-          return json({ ok: true, status: "submitted", provider: "noop", provider_job_id: null }, 202);
+          status = "noop";
+          result = { provider: "noop", reason: "runpod_not_configured" };
+          
+          try {
+            jobRecord = await createJobRecord(env, null, input, status, result);
+          } catch (e) {
+            console.error('Failed to create noop job record:', e);
+          }
+          
+          return json({ ok: true, status: "submitted", provider: "noop", provider_job_id: null, job_id: jobRecord?.id }, 202);
         }
-        return json({ ok: false, error: String(e?.message || e) }, 500);
+        
+        status = "error";
+        result = { error: String(e?.message || e) };
+        
+        try {
+          jobRecord = await createJobRecord(env, null, input, status, result);
+        } catch (e) {
+          console.error('Failed to create error job record:', e);
+        }
+        
+        return json({ ok: false, error: String(e?.message || e), job_id: jobRecord?.id }, 500);
       }
     }
 
@@ -153,8 +261,25 @@ export default {
     }
 
     if (req.method === "GET" && path === "/me") {
-      if (!isAdmin(req, env)) return unauthorized();
-      return json({ ok: true, provider: "noop", message: "supabase_not_configured" }, 202);
+      const authHeader = req.headers.get("authorization") || "";
+      const tokenMatch = /^bearer\s+(.+)$/i.exec(authHeader);
+      
+      if (!tokenMatch) {
+        return json({ ok: false, error: "missing_jwt_token" }, 401);
+      }
+      
+      try {
+        const user = await validateJWT(env, tokenMatch[1]);
+        if (!user) {
+          return json({ ok: false, error: "user_not_found" }, 404);
+        }
+        return json({ ok: true, user: { id: user.id, email: user.email || null } });
+      } catch (e: any) {
+        if (String(e?.message || e).includes("supabase_not_configured")) {
+          return json({ ok: true, provider: "noop", message: "supabase_not_configured" }, 501);
+        }
+        return json({ ok: false, error: String(e?.message || e) }, 401);
+      }
     }
 
     return notFound();

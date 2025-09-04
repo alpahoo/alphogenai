@@ -1,5 +1,8 @@
 name: ci-prod
-on: { workflow_dispatch: {} }
+on: 
+  push:
+    branches: [ "prod" ]
+  workflow_dispatch: {}
 
 permissions:
   id-token: write
@@ -97,6 +100,8 @@ jobs:
           wrangler secret put WEBHOOK_SECRET --env prod <<< "${{ secrets.WEBHOOK_SECRET }}"
           wrangler secret put RUNPOD_API_KEY --env prod <<< "${{ secrets.RUNPOD_API_KEY }}"
           wrangler secret put RUNPOD_ENDPOINT_ID --env prod <<< "${{ secrets.RUNPOD_ENDPOINT_ID }}"
+          wrangler secret put SUPABASE_URL --env prod <<< "${{ secrets.SUPABASE_URL }}"
+          wrangler secret put SUPABASE_SERVICE_ROLE --env prod <<< "${{ secrets.SUPABASE_SERVICE_ROLE }}"
           wrangler deploy --env prod --name "$WORKER_NAME"
       - name: Publish Pages (prod)
         if: hashFiles('app/**') != ''

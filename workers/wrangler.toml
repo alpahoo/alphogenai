@@ -3,5 +3,5 @@ main = "src/index.ts"
 compatibility_date = "2025-09-03"
 
 [[r2_buckets]]
-binding = "ASSETS"
+binding = "R2_BUCKET"
 bucket_name = "alphogenai-assets"

@@ -165,6 +165,8 @@ jobs:
             echo "⚠ Skipping /me test - APP_ADMIN_TOKEN not available"
             exit 0
           fi
+          
+          # Test with admin token (should work as fallback)
           resp=$(curl -sS "$API_BASE/me" \
                   -H "Authorization: Bearer $APP_ADMIN_TOKEN")
           echo "GET /me response: $resp"
@@ -172,6 +174,14 @@ jobs:
           if [ "$ok" != "true" ]; then
             echo "::error::GET /me endpoint failed"
             exit 1
+          fi
+          
+          # Check if it's noop response (Supabase not configured) or real JWT validation
+          provider=$(echo "$resp" | jq -r '.provider // empty')
+          if [ "$provider" = "noop" ]; then
+            echo "✓ GET /me returned noop response (Supabase not configured)"
+          else
+            echo "✓ GET /me returned user data (Supabase configured)"
           fi
           
           echo "✅ All smoke tests passed!"

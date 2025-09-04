@@ -5,14 +5,15 @@ const cfg = new pulumi.Config();
 const accountId  = cfg.require("cfAccountId");
 const zoneId     = cfg.require("cfZoneId");
 const workerName = cfg.get("workerName") || "alphogenai-worker";
+const apiSubdomain = cfg.get("apiSubdomain") || "api";
 
 const stack = pulumi.getStack();
 
 // Un pattern par stack — simple et clair
 const routePattern =
   stack === "prod"
-    ? "api.alphogenai.com/*"
-    : "api-staging.alphogenai.com/*";
+    ? `${apiSubdomain}.alphogen.com/*`
+    : `${apiSubdomain}-staging.alphogen.com/*`;
 
 // 1) On publie un *placeholder* de script pour que la route puisse
 //    toujours se créer (Wrangler redéploiera ensuite le vrai code).
