@@ -40,8 +40,10 @@ const isAdmin = (req: Request, env: Env) => {
   const m = /^bearer\s+(.+)$/i.exec(h);
   return !!m && m[1] === env.APP_ADMIN_TOKEN;
 };
-const isWebhook = (req: Request, env: Env) =>
-  (req.headers.get("x-webhook-secret") || "") === env.WEBHOOK_SECRET;
+const isWebhook = (req: Request, env: Env) => {
+  const secret = req.headers.get("x-webhook-secret") || req.headers.get("X-Webhook-Secret") || "";
+  return secret === env.WEBHOOK_SECRET;
+};
 
 const getR2 = (env: Env) => env.R2_BUCKET;
 
