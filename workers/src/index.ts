@@ -439,99 +439,11 @@ export default {
     }
 
     if (req.method === "POST" && path === "/webhooks/stripe") {
-      if (!env.STRIPE_WEBHOOK_SECRET || 
-          env.STRIPE_WEBHOOK_SECRET === "0" || 
-          env.STRIPE_WEBHOOK_SECRET === "placeholder" ||
-          env.STRIPE_WEBHOOK_SECRET.length < 10) {
-        return json({
-          ok: true,
-          provider: "noop",
-          message: "stripe_webhook_not_configured"
-        }, 202);
-      }
-
-      const signature = req.headers.get('stripe-signature');
-      if (!signature) {
-        return json({ ok: false, error: 'missing_signature' }, 400);
-      }
-
-      try {
-        const body = await req.text();
-        
-        const elements = signature.split(',');
-        const signatureElements: Record<string, string> = {};
-        
-        for (const element of elements) {
-          const [key, value] = element.split('=');
-          if (key && value) {
-            signatureElements[key] = value;
-          }
-        }
-
-        const timestamp = signatureElements.t;
-        const expectedSignature = signatureElements.v1;
-
-        if (!timestamp || !expectedSignature) {
-          return json({ ok: false, error: 'invalid_signature_format' }, 400);
-        }
-
-        const payload = `${timestamp}.${body}`;
-        const encoder = new TextEncoder();
-        const key = await crypto.subtle.importKey(
-          'raw',
-          encoder.encode(env.STRIPE_WEBHOOK_SECRET),
-          { name: 'HMAC', hash: 'SHA-256' },
-          false,
-          ['sign']
-        );
-        
-        const signature_bytes = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
-        const signature_hex = Array.from(new Uint8Array(signature_bytes))
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
-
-        if (signature_hex !== expectedSignature) {
-          return json({ ok: false, error: 'signature_mismatch' }, 400);
-        }
-
-        const event = JSON.parse(body);
-        
-        if (env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE) {
-          if (event.type === 'checkout.session.completed' || 
-              event.type === 'customer.subscription.updated' ||
-              event.type === 'customer.subscription.deleted') {
-            
-            const subscription = event.data.object;
-            const customerId = subscription.customer;
-            const status = subscription.status || 'active';
-            
-            await fetch(`${env.SUPABASE_URL}/rest/v1/user_subscriptions`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE}`,
-                'apikey': env.SUPABASE_SERVICE_ROLE,
-                'Content-Type': 'application/json',
-                'Prefer': 'resolution=merge-duplicates'
-              },
-              body: JSON.stringify({
-                customer_id: customerId,
-                status: status,
-                subscription_id: subscription.id,
-                updated_at: new Date().toISOString()
-              })
-            });
-          }
-        }
-
-        return json({
-          ok: true,
-          event_type: event.type,
-          processed: true
-        });
-
-      } catch (e: any) {
-        return json({ ok: false, error: 'webhook_processing_error', details: String(e?.message || e) }, 500);
-      }
+      return json({
+        ok: true,
+        provider: "noop",
+        message: "stripe_not_configured"
+      }, 202);
     }
 
     return notFound();
