@@ -6,10 +6,13 @@ on:
   workflow_dispatch: {}
 
 permissions:
+  id-token: write
   contents: read
 
 env:
   NODE_VERSION: '20'
+  CF_ACCOUNT_ID: a3ac983a6a5ce4bb150638e1f620c2a7
+  CF_ZONE_ID: 824fa72287d21dd30f97f188f650d6b7
   WORKER_NAME: alphogenai-worker
 
 jobs:
