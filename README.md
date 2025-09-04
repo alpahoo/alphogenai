@@ -1,6 +1,6 @@
 # AlphoGenAI
 
-AI-powered video generation SaaS with Cloudflare Workers backend, Next.js frontend, and Stripe billing integration.
+AI-powered video generation SaaS with Cloudflare Workers backend, Next.js frontend, and optional service integrations.
 
 ## Architecture
 
@@ -9,7 +9,7 @@ AI-powered video generation SaaS with Cloudflare Workers backend, Next.js fronte
 - **Storage**: Cloudflare R2 for assets
 - **Database**: Supabase for user management and subscription tracking
 - **AI Provider**: RunPod for video generation
-- **Billing**: Stripe for subscription management
+- **Billing**: Stripe integration (not implemented - returns noop responses)
 - **Infrastructure**: Pulumi for DNS, routes, and Pages project
 
 ## API Endpoints
@@ -24,10 +24,10 @@ AI-powered video generation SaaS with Cloudflare Workers backend, Next.js fronte
 - `POST /webhooks/test` - Test webhook endpoint
 - `GET /me` - Get user profile (requires JWT)
 
-### Billing Endpoints
+### Billing Endpoints (Not Implemented)
 
-- `POST /billing/checkout` - Create Stripe checkout session (requires JWT)
-- `POST /webhooks/stripe` - Handle Stripe webhook events
+- `POST /billing/checkout` - Returns noop response (Stripe not configured)
+- `POST /webhooks/stripe` - Returns noop response (Stripe not configured)
 
 ### Authentication
 
@@ -45,7 +45,7 @@ The Next.js frontend includes 6 main pages:
 3. **Jobs (/jobs)** - Video generation job management
 4. **Webhooks (/webhooks)** - Webhook testing interface
 5. **Account (/account)** - Supabase authentication and profile
-6. **Billing (/billing)** - Stripe subscription management
+6. **Billing (/billing)** - Billing interface (shows "Stripe non configuré")
 
 ## Environment Variables
 
@@ -56,8 +56,8 @@ The Next.js frontend includes 6 main pages:
 - `RUNPOD_ENDPOINT_ID` - RunPod endpoint ID (optional)
 - `SUPABASE_URL` - Supabase project URL (optional)
 - `SUPABASE_SERVICE_ROLE` - Supabase service role key (optional)
-- `STRIPE_SECRET_KEY` - Stripe secret key (optional)
-- `STRIPE_WEBHOOK_SECRET` - Stripe webhook secret (optional)
+- `STRIPE_SECRET_KEY` - Stripe secret key (not implemented)
+- `STRIPE_WEBHOOK_SECRET` - Stripe webhook secret (not implemented)
 
 ### Frontend Environment Variables
 - `NEXT_PUBLIC_API_BASE` - API base URL (default: https://api.alphogen.com)
