@@ -380,6 +380,14 @@ export default {
         }
       }
 
+      if (!env.STRIPE_SECRET_KEY || env.STRIPE_SECRET_KEY === "0" || env.STRIPE_SECRET_KEY === "placeholder") {
+        return json({
+          ok: true,
+          provider: "noop",
+          message: "stripe_not_configured"
+        }, 202);
+      }
+
       try {
         let payload: any = {};
         try { 
