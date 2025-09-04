@@ -1,7 +1,8 @@
-name: ci-prod
-on: 
+name: ci-cd
+
+on:
   push:
-    branches: [ "prod" ]
+    branches: [ "main" ]
   workflow_dispatch: {}
 
 permissions:
@@ -9,12 +10,12 @@ permissions:
   contents: read
 
 env:
+  NODE_VERSION: '20'
   CF_ACCOUNT_ID: a3ac983a6a5ce4bb150638e1f620c2a7
   CF_ZONE_ID: 824fa72287d21dd30f97f188f650d6b7
-
   WORKER_NAME: alphogenai-worker
   PAGES_PROJECT_PROD: alphogenai-app
-  API_HOST_PROD: api.alphogen.com  # info
+  API_HOST_PROD: api.alphogen.com
 
 jobs:
   test_build:
@@ -22,19 +23,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
       - name: Install app deps (Pages)
         if: hashFiles('app/**') != ''
         working-directory: app
         run: npm ci || npm i
+
       - name: Build app (Pages)
         if: hashFiles('app/**') != ''
         working-directory: app
         run: npm run build --if-present
+
       - name: Install worker deps
         if: hashFiles('workers/**') != ''
         working-directory: workers
         run: npm ci || npm i
+
       - name: Typecheck worker
         if: hashFiles('workers/**') != ''
         working-directory: workers
@@ -46,26 +52,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
       - name: Setup Pulumi CLI
         uses: pulumi/setup-pulumi@v2
+
       - name: Install infra deps
         if: hashFiles('infra/**') != ''
         working-directory: infra
         run: npm ci || npm i
+
       - name: Build infra (ts -> js)
         if: hashFiles('infra/**') != ''
         working-directory: infra
         run: npm run build
+
       - name: Ensure Pulumi stack (prod)
         if: hashFiles('infra/**') != ''
         working-directory: infra
-        env: { PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }} }
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
         run: |
           pulumi stack select prod || pulumi stack init prod
           pulumi config set cfAccountId  $CF_ACCOUNT_ID --stack prod
           pulumi config set cfZoneId     $CF_ZONE_ID    --stack prod
           pulumi config set cfR2Bucket   alphogenai-r2-prod --stack prod
+
       - name: Pulumi up (prod)
         if: hashFiles('infra/**') != ''
         uses: pulumi/actions@v4
@@ -84,17 +97,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
       - name: Install Wrangler
         run: npm i -g wrangler
+
       - name: Ensure worker deps
         if: hashFiles('workers/**') != ''
         working-directory: workers
         run: npm ci || npm i
+
       - name: Deploy Worker (prod)
         if: hashFiles('workers/**') != ''
         working-directory: workers
-        env: { CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }} }
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: |
           wrangler secret put APP_ADMIN_TOKEN --env prod <<< "${{ secrets.APP_ADMIN_TOKEN }}"
           wrangler secret put WEBHOOK_SECRET --env prod <<< "${{ secrets.WEBHOOK_SECRET }}"
@@ -109,10 +127,11 @@ jobs:
             wrangler secret put STRIPE_WEBHOOK_SECRET --env prod <<< "${{ secrets.STRIPE_WEBHOOK_SECRET }}"
           fi
           wrangler deploy --env prod --name "$WORKER_NAME"
+
       - name: Publish Pages (prod)
         if: hashFiles('app/**') != ''
         working-directory: app
-        env: 
+        env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           NEXT_PUBLIC_API_BASE: https://api.alphogen.com
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
