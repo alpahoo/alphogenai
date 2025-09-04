@@ -439,7 +439,7 @@ export default {
     }
 
     if (req.method === "POST" && path === "/webhooks/stripe") {
-      if (!env.STRIPE_WEBHOOK_SECRET) {
+      if (!env.STRIPE_WEBHOOK_SECRET || env.STRIPE_WEBHOOK_SECRET === "0" || env.STRIPE_WEBHOOK_SECRET === "placeholder") {
         return json({
           ok: true,
           provider: "noop",
