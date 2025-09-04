@@ -42,7 +42,15 @@ const isAdmin = (req: Request, env: Env) => {
 };
 const isWebhook = (req: Request, env: Env) => {
   const secret = req.headers.get("x-webhook-secret") || req.headers.get("X-Webhook-Secret") || "";
-  return secret === env.WEBHOOK_SECRET;
+  const expectedSecret = env.WEBHOOK_SECRET;
+  
+  const headerEntries: string[][] = [];
+  req.headers.forEach((value, key) => {
+    headerEntries.push([key, value]);
+  });
+  
+  
+  return secret === expectedSecret;
 };
 
 const getR2 = (env: Env) => env.R2_BUCKET;
