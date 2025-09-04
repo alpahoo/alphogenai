@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 env:
-  API_BASE: https://api.alphogen.com
+  API_BASE: https://api-staging.alphogen.com
 
 jobs:
   smoke:
