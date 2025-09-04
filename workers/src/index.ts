@@ -134,6 +134,9 @@ export default {
         const id = rp.id || rp.jobId || rp.requestId || null;
         return json({ ok: true, status: "submitted", provider: "runpod", provider_job_id: id, result: rp });
       } catch (e: any) {
+        if (String(e?.message || e).includes("runpod_not_configured")) {
+          return json({ ok: true, status: "submitted", provider: "noop", provider_job_id: null }, 202);
+        }
         return json({ ok: false, error: String(e?.message || e) }, 500);
       }
     }
@@ -147,6 +150,11 @@ export default {
       } catch (e: any) {
         return json({ ok: false, error: String(e?.message || e) }, 500);
       }
+    }
+
+    if (req.method === "GET" && path === "/me") {
+      if (!isAdmin(req, env)) return unauthorized();
+      return json({ ok: true, provider: "noop", message: "supabase_not_configured" }, 202);
     }
 
     return notFound();

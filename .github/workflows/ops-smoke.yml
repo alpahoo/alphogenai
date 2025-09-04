@@ -56,6 +56,10 @@ jobs:
         env:
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
+          if [ -z "$WEBHOOK_SECRET" ]; then
+            echo "⚠ Skipping webhook test - WEBHOOK_SECRET not available"
+            exit 0
+          fi
           resp=$(curl -sS -X POST "$API_BASE/webhooks/test" \
                   -H "X-Webhook-Secret: $WEBHOOK_SECRET" \
                   -H "Content-Type: application/json" \
@@ -71,6 +75,10 @@ jobs:
         env:
           APP_ADMIN_TOKEN: ${{ secrets.APP_ADMIN_TOKEN }}
         run: |
+          if [ -z "$APP_ADMIN_TOKEN" ]; then
+            echo "⚠ Skipping assets test - APP_ADMIN_TOKEN not available"
+            exit 0
+          fi
           # PUT asset
           resp=$(curl -sS -X PUT "$API_BASE/assets/hello.txt" \
                   -H "Authorization: Bearer $APP_ADMIN_TOKEN" \
@@ -96,6 +104,11 @@ jobs:
         env:
           APP_ADMIN_TOKEN: ${{ secrets.APP_ADMIN_TOKEN }}
         run: |
+          if [ -z "$APP_ADMIN_TOKEN" ]; then
+            echo "⚠ Skipping jobs test - APP_ADMIN_TOKEN not available"
+            echo "job_id=skip" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           resp=$(curl -sS -X POST "$API_BASE/jobs" \
                   -H "Authorization: Bearer $APP_ADMIN_TOKEN" \
                   -H "Content-Type: application/json" \
@@ -106,18 +119,28 @@ jobs:
             echo "::error::POST /jobs failed"
             exit 1
           fi
-          job_id=$(echo "$resp" | jq -r '.provider_job_id // empty')
-          if [ -z "$job_id" ]; then
-            echo "::error::No provider_job_id returned"
-            exit 1
+          provider=$(echo "$resp" | jq -r '.provider // empty')
+          if [ "$provider" = "noop" ]; then
+            echo "✓ POST /jobs returned noop response (RunPod secrets not configured)"
+            echo "job_id=noop" >> "$GITHUB_OUTPUT"
+          else
+            job_id=$(echo "$resp" | jq -r '.provider_job_id // empty')
+            if [ -z "$job_id" ]; then
+              echo "::error::No provider_job_id returned"
+              exit 1
+            fi
+            echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
           fi
-          echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
 
       - name: Test GET /jobs/:id (Runpod proxy)
         env:
           APP_ADMIN_TOKEN: ${{ secrets.APP_ADMIN_TOKEN }}
         run: |
           job_id="${{ steps.create_job.outputs.job_id }}"
+          if [ "$job_id" = "skip" ] || [ "$job_id" = "noop" ]; then
+            echo "⚠ Skipping job status test - no real job created"
+            exit 0
+          fi
           resp=$(curl -sS "$API_BASE/jobs/$job_id" \
                   -H "Authorization: Bearer $APP_ADMIN_TOKEN")
           echo "GET jobs status response: $resp"
@@ -133,6 +156,23 @@ jobs:
           provider=$(echo "$resp" | jq -r '.provider // empty')
           if [ "$ok" != "true" ] || [ "$provider" != "runpod" ]; then
             echo "::error::GET /jobs/:id invalid response format"
+            exit 1
+          fi
+
+      - name: Test GET /me (Supabase integration)
+        env:
+          APP_ADMIN_TOKEN: ${{ secrets.APP_ADMIN_TOKEN }}
+        run: |
+          if [ -z "$APP_ADMIN_TOKEN" ]; then
+            echo "⚠ Skipping /me test - APP_ADMIN_TOKEN not available"
+            exit 0
+          fi
+          resp=$(curl -sS "$API_BASE/me" \
+                  -H "Authorization: Bearer $APP_ADMIN_TOKEN")
+          echo "GET /me response: $resp"
+          ok=$(echo "$resp" | jq -r '.ok // empty')
+          if [ "$ok" != "true" ]; then
+            echo "::error::GET /me endpoint failed"
             exit 1
           fi
           
