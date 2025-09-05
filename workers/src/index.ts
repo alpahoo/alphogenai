@@ -108,8 +108,14 @@ async function createUser(env: Env, email: string, passwordHash: string): Promis
   }
 
   if (isSupabaseConfigured(env)) {
-    const [created] = await supabaseRequest(env, 'POST', 'users', user)
-    return created
+    try {
+      const [created] = await supabaseRequest(env, 'POST', 'users', user)
+      return created
+    } catch (error) {
+      console.error('Supabase createUser error:', error)
+      users.set(user.id, user)
+      return user
+    }
   } else {
     users.set(user.id, user)
     return user
@@ -118,8 +124,18 @@ async function createUser(env: Env, email: string, passwordHash: string): Promis
 
 async function getUserByEmail(env: Env, email: string): Promise<User | null> {
   if (isSupabaseConfigured(env)) {
-    const usersResult = await supabaseRequest(env, 'GET', 'users', null, `email=eq.${email}`)
-    return usersResult[0] || null
+    try {
+      const usersResult = await supabaseRequest(env, 'GET', 'users', null, `email=eq.${email}`)
+      return usersResult[0] || null
+    } catch (error) {
+      console.error('Supabase getUserByEmail error:', error)
+      for (const user of users.values()) {
+        if (user.email === email) {
+          return user
+        }
+      }
+      return null
+    }
   } else {
     for (const user of users.values()) {
       if (user.email === email) {
