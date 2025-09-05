@@ -499,6 +499,19 @@ export default {
     const path = url.pathname
 
     try {
+      if (path === '/health') {
+        return new Response(JSON.stringify({ 
+          ok: true, 
+          timestamp: new Date().toISOString(),
+          version: '1.0.0',
+          supabase_configured: isSupabaseConfigured(env),
+          runpod_configured: !!(env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID)
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
       if (path.startsWith('/api/auth/')) {
         return handleAuth(request, env)
       }
