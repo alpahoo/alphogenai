@@ -70,6 +70,10 @@ function isSupabaseConfigured(env: Env): boolean {
          env.SUPABASE_SERVICE_ROLE !== 'your_supabase_service_role_key')
 }
 
+function isJWTConfigured(env: Env): boolean {
+  return !!(env.JWT_SECRET && env.JWT_SECRET.length > 0)
+}
+
 async function supabaseRequest(env: Env, method: string, table: string, data?: any, filters?: string): Promise<any> {
   const url = `${env.SUPABASE_URL}/rest/v1/${table}${filters ? `?${filters}` : ''}`
   
@@ -529,7 +533,8 @@ export default {
           timestamp: new Date().toISOString(),
           version: '1.0.0',
           supabase_configured: isSupabaseConfigured(env),
-          runpod_configured: !!(env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID)
+          runpod_configured: !!(env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID),
+          jwt_configured: isJWTConfigured(env)
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
