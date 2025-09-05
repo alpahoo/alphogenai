@@ -101,8 +101,8 @@ jobs:
 
       - name: Test Frontend Pages
         run: |
-          # Test main pages are accessible
-          for page in "" "login" "signup"; do
+          # Test main pages are accessible (handle trailing slash redirects)
+          for page in "" "login/" "signup/"; do
             url="https://alphogenai-app.pages.dev/$page"
             response=$(curl -s -w "%{http_code}" "$url")
             http_code="${response: -3}"
