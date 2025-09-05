@@ -64,24 +64,24 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: |
-          echo "${{ secrets.JWT_SECRET }}" | npx wrangler secret put JWT_SECRET --env prod --name alphogenai-worker --yes
+          echo "${{ secrets.JWT_SECRET }}" | npx wrangler secret put JWT_SECRET --env prod
 
       - name: Set Worker Secrets
         working-directory: workers
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: |
-          echo "${{ secrets.SUPABASE_URL }}" | npx wrangler secret put SUPABASE_URL --env prod --name alphogenai-worker --yes
-          echo "${{ secrets.SUPABASE_SERVICE_ROLE }}" | npx wrangler secret put SUPABASE_SERVICE_ROLE --env prod --name alphogenai-worker --yes
-          echo "${{ secrets.RUNPOD_API_KEY }}" | npx wrangler secret put RUNPOD_API_KEY --env prod --name alphogenai-worker --yes
-          echo "${{ secrets.RUNPOD_ENDPOINT_ID }}" | npx wrangler secret put RUNPOD_ENDPOINT_ID --env prod --name alphogenai-worker --yes
+          echo "${{ secrets.SUPABASE_URL }}" | npx wrangler secret put SUPABASE_URL --env prod
+          echo "${{ secrets.SUPABASE_SERVICE_ROLE }}" | npx wrangler secret put SUPABASE_SERVICE_ROLE --env prod
+          echo "${{ secrets.RUNPOD_API_KEY }}" | npx wrangler secret put RUNPOD_API_KEY --env prod
+          echo "${{ secrets.RUNPOD_ENDPOINT_ID }}" | npx wrangler secret put RUNPOD_ENDPOINT_ID --env prod
 
       - name: Deploy Worker
         working-directory: workers
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: |
-          wrangler deploy --env prod --name "$WORKER_NAME"
+          wrangler deploy --env prod
 
   deploy_frontend:
     runs-on: ubuntu-latest
