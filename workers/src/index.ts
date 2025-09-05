@@ -289,7 +289,9 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Failed to create user' }), {
+      console.error('Signup error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      return new Response(JSON.stringify({ error: 'Failed to create user', details: errorMessage }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -332,7 +334,9 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Login failed' }), {
+      console.error('Login error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      return new Response(JSON.stringify({ error: 'Login failed', details: errorMessage }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
