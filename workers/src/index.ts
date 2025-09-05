@@ -92,7 +92,9 @@ async function supabaseRequest(env: Env, method: string, table: string, data?: a
   const response = await fetch(url, options)
   
   if (!response.ok) {
-    throw new Error(`Supabase error: ${response.status} ${await response.text()}`)
+    const errorText = await response.text()
+    console.error(`Supabase ${method} ${table} failed:`, response.status, response.statusText, errorText)
+    throw new Error(`Supabase error: ${response.status} ${response.statusText}`)
   }
 
   return response.json()
