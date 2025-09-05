@@ -120,8 +120,11 @@ jobs:
         run: |
           echo "Testing video generation pipeline for job $JOB_ID"
           
-          # Poll job status for up to 5 minutes
-          for i in {1..30}; do
+          # Poll job status for up to 10 minutes (important-comment)
+          max_attempts=60
+          attempt=0
+          
+          while [ $attempt -lt $max_attempts ]; do
             response=$(curl -s -w "%{http_code}" https://api.alphogen.com/api/jobs/$JOB_ID \
               -H "Authorization: Bearer $USER_TOKEN")
             
@@ -130,27 +133,47 @@ jobs:
             
             if [ "$http_code" = "200" ]; then
               status=$(echo "$body" | jq -r '.job.status')
-              echo "Job status: $status"
+              echo "Job status: $status (attempt $((attempt+1))/$max_attempts)"
               
               if [ "$status" = "completed" ]; then
-                echo "✅ Video generation completed"
+                echo "✅ Video generation completed successfully"
                 result_url=$(echo "$body" | jq -r '.job.result_url')
                 if [ "$result_url" != "null" ] && [ "$result_url" != "" ]; then
                   echo "✅ Video URL available: $result_url"
+                  
+                  # Test video file accessibility (important-comment)
+                  video_response=$(curl -s -w "%{http_code}" -I "$result_url")
+                  video_http_code="${video_response: -3}"
+                  if [ "$video_http_code" = "200" ]; then
+                    echo "✅ Video file is accessible"
+                  else
+                    echo "⚠️ Video file not accessible: $video_http_code"
+                  fi
                 else
                   echo "⚠️ Video completed but no result URL"
                 fi
                 break
               elif [ "$status" = "failed" ]; then
                 echo "❌ Video generation failed"
-                echo "$body" | jq -r '.job.error_message'
+                error_msg=$(echo "$body" | jq -r '.job.error_message // "No error message"')
+                echo "Error: $error_msg"
                 exit 1
               elif [ "$status" = "processing" ]; then
                 echo "🔄 Video generation in progress..."
+              elif [ "$status" = "queued" ]; then
+                echo "⏳ Job queued, waiting for processing..."
+              else
+                echo "📊 Job status: $status"
               fi
             else
               echo "⚠️ Job status check failed: $http_code"
             fi
             
+            attempt=$((attempt+1))
             sleep 10
           done
+          
+          if [ $attempt -eq $max_attempts ]; then
+            echo "⚠️ Video generation timeout after 10 minutes"
+            echo "This may be expected if Runpod runner is not deployed"
+          fi

@@ -113,6 +113,7 @@ async function createUser(env: Env, email: string, passwordHash: string): Promis
       return created
     } catch (error) {
       console.error('Supabase createUser error:', error)
+      // Fallback to in-memory storage if Supabase fails
       users.set(user.id, user)
       return user
     }
@@ -129,6 +130,7 @@ async function getUserByEmail(env: Env, email: string): Promise<User | null> {
       return usersResult[0] || null
     } catch (error) {
       console.error('Supabase getUserByEmail error:', error)
+      // Fallback to in-memory storage if Supabase fails
       for (const user of users.values()) {
         if (user.email === email) {
           return user

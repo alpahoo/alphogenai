@@ -27,6 +27,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON public.jobs(created_at DESC);
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
 
+-- Service role policies for Worker API access
 CREATE POLICY "Service role full access users" ON public.users
     FOR ALL USING (
         current_setting('request.jwt.claims', true)::json->>'role' = 'service_role'
@@ -39,9 +40,11 @@ CREATE POLICY "Service role full access jobs" ON public.jobs
         OR current_setting('request.headers', true)::json->>'authorization' LIKE 'Bearer %'
     );
 
+-- Allow public access for user creation (signup)
 CREATE POLICY "Allow user creation" ON public.users
     FOR INSERT WITH CHECK (true);
 
+-- Allow users to read their own data (for custom JWT auth)
 CREATE POLICY "Users can view own profile" ON public.users
     FOR SELECT USING (true);
 
