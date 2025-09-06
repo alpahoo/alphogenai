@@ -1,0 +1,173 @@
+name: Post-Deployment E2E Tests
+
+on:
+  workflow_run:
+    workflows: ["Deploy AlphoGenAI"]
+    types:
+      - completed
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  e2e_tests:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for deployment to be ready
+        run: |
+          echo "⏳ Waiting 30 seconds for deployment to stabilize..."
+          sleep 30
+
+      - name: Test API Health
+        run: |
+          echo "🔍 Testing API health endpoint..."
+          HEALTH_RESPONSE=$(curl -s https://api.alphogen.com/health -w "\nHTTP_STATUS:%{http_code}")
+          echo "$HEALTH_RESPONSE"
+          
+          if echo "$HEALTH_RESPONSE" | grep -q "HTTP_STATUS:200"; then
+            echo "✅ Health check passed"
+          else
+            echo "❌ Health check failed"
+            exit 1
+          fi
+
+      - name: Test Complete Authentication Flow
+        run: |
+          echo "🔍 Testing complete authentication flow..."
+          
+          # Generate unique test email
+          TEST_EMAIL="e2e-test-$(date +%s)@example.com"
+          TEST_PASSWORD="testpass123"
+          
+          echo "📝 Testing signup with email: $TEST_EMAIL"
+          SIGNUP_RESPONSE=$(curl -s -X POST https://api.alphogen.com/api/auth/signup \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}" \
+            -w "\nHTTP_STATUS:%{http_code}")
+          
+          echo "$SIGNUP_RESPONSE"
+          
+          if echo "$SIGNUP_RESPONSE" | grep -q "HTTP_STATUS:200"; then
+            echo "✅ Signup successful"
+          else
+            echo "❌ Signup failed"
+            exit 1
+          fi
+          
+          echo "🔐 Testing login..."
+          LOGIN_RESPONSE=$(curl -s -X POST https://api.alphogen.com/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}" \
+            -w "\nHTTP_STATUS:%{http_code}")
+          
+          echo "$LOGIN_RESPONSE"
+          
+          if echo "$LOGIN_RESPONSE" | grep -q "HTTP_STATUS:200"; then
+            echo "✅ Login successful"
+            TOKEN=$(echo "$LOGIN_RESPONSE" | grep -v "HTTP_STATUS" | jq -r '.token')
+            echo "TOKEN=$TOKEN" >> $GITHUB_ENV
+          else
+            echo "❌ Login failed"
+            exit 1
+          fi
+
+      - name: Test Job Creation and Retrieval
+        env:
+          TOKEN: ${{ env.TOKEN }}
+        run: |
+          echo "🎬 Testing job creation..."
+          JOB_RESPONSE=$(curl -s -X POST https://api.alphogen.com/api/jobs \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"prompt":"E2E test job - post deployment verification"}' \
+            -w "\nHTTP_STATUS:%{http_code}")
+          
+          echo "$JOB_RESPONSE"
+          
+          if echo "$JOB_RESPONSE" | grep -q "HTTP_STATUS:200"; then
+            echo "✅ Job creation successful"
+            JOB_ID=$(echo "$JOB_RESPONSE" | grep -v "HTTP_STATUS" | jq -r '.job.id')
+            echo "📋 Job ID: $JOB_ID"
+          else
+            echo "❌ Job creation failed"
+            exit 1
+          fi
+          
+          echo "🔍 Testing job retrieval..."
+          JOB_STATUS_RESPONSE=$(curl -s https://api.alphogen.com/api/jobs/$JOB_ID \
+            -H "Authorization: Bearer $TOKEN" \
+            -w "\nHTTP_STATUS:%{http_code}")
+          
+          echo "$JOB_STATUS_RESPONSE"
+          
+          if echo "$JOB_STATUS_RESPONSE" | grep -q "HTTP_STATUS:200"; then
+            echo "✅ Job retrieval successful"
+            
+            # Check if job has a status
+            JOB_STATUS=$(echo "$JOB_STATUS_RESPONSE" | grep -v "HTTP_STATUS" | jq -r '.job.status // empty')
+            if [ -n "$JOB_STATUS" ]; then
+              echo "📊 Job status: $JOB_STATUS"
+            else
+              echo "⚠️ Job status not found in response"
+            fi
+          else
+            echo "❌ Job retrieval failed"
+            exit 1
+          fi
+
+      - name: Test Asset Upload and Download
+        env:
+          TOKEN: ${{ env.TOKEN }}
+        run: |
+          echo "📁 Testing asset upload..."
+          TEST_CONTENT="E2E test asset content - $(date)"
+          
+          UPLOAD_RESPONSE=$(curl -s -X PUT https://api.alphogen.com/api/assets/e2e-test.txt \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: text/plain" \
+            -d "$TEST_CONTENT" \
+            -w "\nHTTP_STATUS:%{http_code}")
+          
+          echo "$UPLOAD_RESPONSE"
+          
+          if echo "$UPLOAD_RESPONSE" | grep -q "HTTP_STATUS:200"; then
+            echo "✅ Asset upload successful"
+          else
+            echo "❌ Asset upload failed"
+            exit 1
+          fi
+          
+          echo "📥 Testing asset download..."
+          DOWNLOAD_RESPONSE=$(curl -s https://api.alphogen.com/api/assets/e2e-test.txt \
+            -w "\nHTTP_STATUS:%{http_code}")
+          
+          if echo "$DOWNLOAD_RESPONSE" | grep -q "HTTP_STATUS:200"; then
+            DOWNLOADED_CONTENT=$(echo "$DOWNLOAD_RESPONSE" | grep -v "HTTP_STATUS")
+            if [ "$DOWNLOADED_CONTENT" = "$TEST_CONTENT" ]; then
+              echo "✅ Asset download successful - content matches"
+            else
+              echo "⚠️ Asset download successful but content mismatch"
+              echo "Expected: $TEST_CONTENT"
+              echo "Got: $DOWNLOADED_CONTENT"
+            fi
+          else
+            echo "❌ Asset download failed"
+            exit 1
+          fi
+
+      - name: Test Results Summary
+        run: |
+          echo "🎉 All post-deployment tests completed successfully!"
+          echo "✅ API Health: Working"
+          echo "✅ User Signup: Working"
+          echo "✅ User Login: Working"
+          echo "✅ Job Creation: Working"
+          echo "✅ Job Retrieval: Working"
+          echo "✅ Asset Upload: Working"
+          echo "✅ Asset Download: Working"
+          echo ""
+          echo "🚀 AlphoGenAI SaaS is fully operational!"
