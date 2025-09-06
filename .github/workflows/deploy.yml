@@ -49,18 +49,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Supabase CLI and Apply Migrations
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      - name: Install PostgreSQL client
         run: |
-          curl -fsSL "https://github.com/supabase/cli/releases/download/v2.39.2/supabase_linux_amd64.tar.gz" -o supabase.tar.gz
-          rm -rf supabase
-          tar -xzf supabase.tar.gz
-          ./supabase db execute \
-            --project-ref "$SUPABASE_PROJECT_REF" \
-            --access-token "$SUPABASE_ACCESS_TOKEN" \
-            --file supabase/migrations/001_initial_schema.sql
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Apply Supabase migrations (psql)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "❌ Secret SUPABASE_DB_URL manquant"; exit 1
+          fi
+          echo "🔎 Test de connexion…"
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c 'select 1;'
+          echo "🚀 Application des migrations…"
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/001_initial_schema.sql
+          echo "✅ Migrations appliquées"
 
   deploy_worker:
     runs-on: ubuntu-latest
