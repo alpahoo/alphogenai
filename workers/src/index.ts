@@ -228,18 +228,31 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
     updated_at: new Date().toISOString(),
   }
 
+  console.log(`DEBUG: createJob called for user ${userId}, generated job ID: ${job.id}`)
+  console.log(`DEBUG: Supabase configured: ${isSupabaseConfigured(env)}`)
+
   if (isSupabaseConfigured(env)) {
     try {
       console.log(`DEBUG: Creating job in Supabase for user ${userId}, job ID: ${job.id}`)
+      console.log(`DEBUG: Job payload:`, JSON.stringify(job))
+      
       const [created] = await supabaseRequest(env, 'POST', 'jobs', job)
       console.log(`DEBUG: Job created successfully in Supabase: ${created.id}`)
+      console.log(`DEBUG: Created job details:`, JSON.stringify(created))
+      
+      jobs.set(created.id, created)
+      console.log(`DEBUG: Job ${created.id} also cached in memory for immediate access`)
+      
       await triggerRunpodJob(env, created)
       return created
     } catch (error) {
       console.error('Supabase createJob error:', error)
+      console.log(`DEBUG: Supabase createJob error details:`, (error as Error).message || error)
       console.log(`DEBUG: Falling back to in-memory storage for job ${job.id}`)
-      // Fallback to in-memory storage if Supabase fails
+      
       jobs.set(job.id, job)
+      console.log(`DEBUG: Job ${job.id} stored in in-memory fallback`)
+      
       await triggerRunpodJob(env, job)
       return job
     }
@@ -254,12 +267,18 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
 async function getJob(env: Env, id: string): Promise<Job | null> {
   console.log(`DEBUG: getJob called for ID: ${id}`)
   console.log(`DEBUG: In-memory jobs count: ${jobs.size}`)
+  console.log(`DEBUG: Supabase configured: ${isSupabaseConfigured(env)}`)
+  console.log(`DEBUG: SUPABASE_URL: ${env.SUPABASE_URL?.substring(0, 50)}...`)
+  console.log(`DEBUG: SUPABASE_SERVICE_ROLE: ${env.SUPABASE_SERVICE_ROLE?.substring(0, 20)}...`)
   
   if (isSupabaseConfigured(env)) {
     try {
       console.log(`DEBUG: Getting job from Supabase by ID: ${id} with service_role auth`)
+      console.log(`DEBUG: Query URL: ${env.SUPABASE_URL}/rest/v1/jobs?id=eq.${id}`)
+      
       const jobsResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${id}`)
       console.log(`DEBUG: Supabase query returned ${jobsResult?.length || 0} jobs for ID ${id}`)
+      console.log(`DEBUG: Raw Supabase response:`, JSON.stringify(jobsResult))
       
       if (jobsResult && jobsResult.length > 0) {
         const job = jobsResult[0]
@@ -270,23 +289,34 @@ async function getJob(env: Env, id: string): Promise<Job | null> {
         
         return job
       } else {
-        console.log(`DEBUG: No job found in Supabase, checking in-memory storage`)
+        console.log(`DEBUG: No job found in Supabase with ID ${id}`)
+        console.log(`DEBUG: Checking if job exists in in-memory storage...`)
         const job = jobs.get(id) || null
         console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage`)
+        if (job) {
+          console.log(`DEBUG: In-memory job details: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
+        }
         return job
       }
     } catch (error) {
       console.error('Supabase getJob error:', error)
-      console.log(`DEBUG: Supabase error, falling back to in-memory storage for job ${id}`)
-      // Fallback to in-memory storage if Supabase fails
+      console.log(`DEBUG: Supabase error details:`, (error as Error).message || error)
+      console.log(`DEBUG: Falling back to in-memory storage for job ${id}`)
+      
       const job = jobs.get(id) || null
-      console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage`)
+      console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage after Supabase error`)
+      if (job) {
+        console.log(`DEBUG: In-memory job details: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
+      }
       return job
     }
   } else {
     console.log(`DEBUG: Supabase not configured, checking in-memory storage for job ${id}`)
     const job = jobs.get(id) || null
     console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage`)
+    if (job) {
+      console.log(`DEBUG: In-memory job details: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
+    }
     return job
   }
 }
