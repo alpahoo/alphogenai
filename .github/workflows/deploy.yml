@@ -43,9 +43,32 @@ jobs:
         working-directory: workers
         run: npm run typecheck
 
-  deploy_worker:
+  apply_migrations:
     runs-on: ubuntu-latest
     needs: test_build
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      
+      - name: Apply Supabase migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -n "$SUPABASE_DB_URL" ]; then
+            echo "Applying Supabase migrations..."
+            psql "$SUPABASE_DB_URL" -f supabase/migrations/001_initial_schema.sql
+            echo "Migrations applied successfully"
+          else
+            echo "SUPABASE_DB_URL not configured, skipping migrations"
+          fi
+
+  deploy_worker:
+    runs-on: ubuntu-latest
+    needs: [test_build, apply_migrations]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -85,7 +108,7 @@ jobs:
 
   deploy_frontend:
     runs-on: ubuntu-latest
-    needs: test_build
+    needs: [test_build, apply_migrations]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
