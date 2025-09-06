@@ -412,7 +412,11 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
     try {
       const user = await getUserByEmail(env, email)
       if (!user) {
-        return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+        console.log(`DEBUG: User not found for email ${email}`)
+        return new Response(JSON.stringify({ 
+          error: 'Invalid credentials',
+          debug: 'User not found in database'
+        }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -427,7 +431,10 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
       if (!isValid) {
         console.log(`DEBUG: Password verification failed for user ${user.email}`)
         console.log(`DEBUG: This suggests either hash mismatch or RLS blocking service_role access`)
-        return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+        return new Response(JSON.stringify({ 
+          error: 'Invalid credentials',
+          debug: `Password verification failed. Hash starts with: ${user.password_hash?.substring(0, 10)}..., Algorithm: ${user.password_hash?.startsWith('$2b$') ? 'bcrypt' : 'unknown'}`
+        }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
