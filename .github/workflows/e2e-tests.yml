@@ -119,6 +119,82 @@ jobs:
             fi
           done
 
+      - name: Test Complete Auth and Job Flow
+        run: |
+          echo "=== Testing signup → login → job creation → retrieval ==="
+          
+          # Generate unique test credentials
+          TEST_EMAIL="e2e-complete-$(date +%s)@example.com"
+          TEST_PASSWORD="testpass123"
+          
+          # Test signup
+          SIGNUP_RESPONSE=$(curl -s -w "%{http_code}" -X POST https://api.alphogen.com/api/auth/signup \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}")
+          
+          SIGNUP_HTTP_CODE="${SIGNUP_RESPONSE: -3}"
+          SIGNUP_BODY="${SIGNUP_RESPONSE%???}"
+          
+          echo "Signup response ($SIGNUP_HTTP_CODE): $SIGNUP_BODY"
+          
+          if [ "$SIGNUP_HTTP_CODE" != "200" ]; then
+            echo "❌ Signup failed: $SIGNUP_HTTP_CODE $SIGNUP_BODY"
+            exit 1
+          fi
+          
+          SIGNUP_TOKEN=$(echo "$SIGNUP_BODY" | jq -r '.token')
+          
+          # Test login with same credentials
+          LOGIN_RESPONSE=$(curl -s -w "%{http_code}" -X POST https://api.alphogen.com/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}")
+          
+          LOGIN_HTTP_CODE="${LOGIN_RESPONSE: -3}"
+          LOGIN_BODY="${LOGIN_RESPONSE%???}"
+          
+          echo "Login response ($LOGIN_HTTP_CODE): $LOGIN_BODY"
+          
+          if [ "$LOGIN_HTTP_CODE" != "200" ]; then
+            echo "❌ Login failed: $LOGIN_HTTP_CODE $LOGIN_BODY"
+            exit 1
+          fi
+          
+          LOGIN_TOKEN=$(echo "$LOGIN_BODY" | jq -r '.token')
+          
+          # Test job creation
+          JOB_RESPONSE=$(curl -s -w "%{http_code}" -X POST https://api.alphogen.com/api/jobs \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $LOGIN_TOKEN" \
+            -d '{"prompt":"E2E test job for auth flow validation"}')
+          
+          JOB_HTTP_CODE="${JOB_RESPONSE: -3}"
+          JOB_BODY="${JOB_RESPONSE%???}"
+          
+          echo "Job creation response ($JOB_HTTP_CODE): $JOB_BODY"
+          
+          if [ "$JOB_HTTP_CODE" != "200" ] && [ "$JOB_HTTP_CODE" != "201" ]; then
+            echo "❌ Job creation failed: $JOB_HTTP_CODE $JOB_BODY"
+            exit 1
+          fi
+          
+          JOB_ID=$(echo "$JOB_BODY" | jq -r '.job.id')
+          
+          # Test job retrieval immediately after creation
+          GET_JOB_RESPONSE=$(curl -s -w "%{http_code}" https://api.alphogen.com/api/jobs/$JOB_ID \
+            -H "Authorization: Bearer $LOGIN_TOKEN")
+          
+          GET_JOB_HTTP_CODE="${GET_JOB_RESPONSE: -3}"
+          GET_JOB_BODY="${GET_JOB_RESPONSE%???}"
+          
+          echo "Job retrieval response ($GET_JOB_HTTP_CODE): $GET_JOB_BODY"
+          
+          if [ "$GET_JOB_HTTP_CODE" != "200" ]; then
+            echo "❌ Job retrieval failed: $GET_JOB_HTTP_CODE $GET_JOB_BODY"
+            exit 1
+          fi
+          
+          echo "✅ Complete auth and job flow test passed!"
+
       - name: Test Video Generation Pipeline
         if: env.JOB_ID != '' && env.JOB_ID != 'mock_job_id'
         run: |
