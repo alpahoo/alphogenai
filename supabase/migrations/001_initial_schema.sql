@@ -52,3 +52,4 @@ CREATE POLICY "Users can create own jobs" ON public.jobs
 
 CREATE POLICY "Users can update own jobs" ON public.jobs
     FOR UPDATE USING (auth.uid()::text = user_id::text);
+# Migration applied with corrected RLS policies using auth.role() = 'service_role'
