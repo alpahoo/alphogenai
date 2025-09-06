@@ -83,6 +83,8 @@ async function supabaseRequest(env: Env, method: string, table: string, data?: a
     'Content-Type': 'application/json',
     'Prefer': 'return=representation'
   }
+  
+  console.log(`DEBUG: Supabase request headers - apikey: ${env.SUPABASE_SERVICE_ROLE?.substring(0, 20)}..., Authorization: Bearer ${env.SUPABASE_SERVICE_ROLE?.substring(0, 20)}...`)
 
   console.log(`DEBUG: Supabase ${method} ${table} with service_role auth`)
 
@@ -378,8 +380,12 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
         })
       }
 
+      console.log(`DEBUG: Verifying password for user ${user.id}`)
+      console.log(`DEBUG: Stored hash: ${user.password_hash?.substring(0, 20)}...`)
       const isValid = await verifyPassword(password, user.password_hash)
+      console.log(`DEBUG: Password verification result: ${isValid}`)
       if (!isValid) {
+        console.log(`DEBUG: Password verification failed for user ${user.email}`)
         return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
