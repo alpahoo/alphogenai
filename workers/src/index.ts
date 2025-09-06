@@ -121,12 +121,19 @@ async function createUser(env: Env, email: string, passwordHash: string): Promis
 
   console.log(`DEBUG: Creating user ${email} with service_role auth`)
   console.log(`DEBUG: Password hash length: ${passwordHash.length}`)
+  console.log(`DEBUG: Generated user ID: ${user.id}`)
 
   if (isSupabaseConfigured(env)) {
     try {
       console.log(`DEBUG: Attempting to create user in Supabase with service_role`)
       const [created] = await supabaseRequest(env, 'POST', 'users', user)
       console.log(`DEBUG: User created successfully in Supabase: ${created.id}`)
+      console.log(`DEBUG: Supabase returned user email: ${created.email}`)
+      console.log(`DEBUG: Supabase returned password_hash length: ${created.password_hash?.length}`)
+      
+      users.set(created.id, created)
+      console.log(`DEBUG: User also stored in memory for consistency`)
+      
       return created
     } catch (error) {
       console.error('Supabase createUser error:', error)
@@ -143,15 +150,39 @@ async function createUser(env: Env, email: string, passwordHash: string): Promis
 }
 
 async function getUserByEmail(env: Env, email: string): Promise<User | null> {
+  console.log(`DEBUG: getUserByEmail called for: ${email}`)
+  console.log(`DEBUG: In-memory users count: ${users.size}`)
+  
   if (isSupabaseConfigured(env)) {
     try {
       console.log(`DEBUG: Getting user by email from Supabase: ${email}`)
       const usersResult = await supabaseRequest(env, 'GET', 'users', null, `email=eq.${email}`)
-      console.log(`DEBUG: Found ${usersResult?.length || 0} users in Supabase for email ${email}`)
-      return usersResult[0] || null
+      console.log(`DEBUG: Supabase query returned ${usersResult?.length || 0} users for email ${email}`)
+      
+      if (usersResult && usersResult.length > 0) {
+        const user = usersResult[0]
+        console.log(`DEBUG: Found user in Supabase: ${user.id}, email: ${user.email}`)
+        console.log(`DEBUG: Supabase user password_hash length: ${user.password_hash?.length}`)
+        console.log(`DEBUG: Supabase user password_hash starts with: ${user.password_hash?.substring(0, 10)}...`)
+        
+        users.set(user.id, user)
+        console.log(`DEBUG: User cached in memory for future lookups`)
+        
+        return user
+      } else {
+        console.log(`DEBUG: No user found in Supabase, checking in-memory storage`)
+        for (const user of users.values()) {
+          if (user.email === email) {
+            console.log(`DEBUG: Found user in in-memory storage: ${user.id}`)
+            return user
+          }
+        }
+        console.log(`DEBUG: User not found in either Supabase or in-memory storage`)
+        return null
+      }
     } catch (error) {
       console.error('Supabase getUserByEmail error:', error)
-      console.log(`DEBUG: Falling back to in-memory storage for email ${email}`)
+      console.log(`DEBUG: Supabase error, falling back to in-memory storage for email ${email}`)
       // Fallback to in-memory storage if Supabase fails
       for (const user of users.values()) {
         if (user.email === email) {
@@ -159,7 +190,7 @@ async function getUserByEmail(env: Env, email: string): Promise<User | null> {
           return user
         }
       }
-      console.log(`DEBUG: User not found in in-memory storage`)
+      console.log(`DEBUG: User not found in in-memory storage either`)
       return null
     }
   } else {
