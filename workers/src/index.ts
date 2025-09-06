@@ -177,9 +177,16 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
   }
 
   if (isSupabaseConfigured(env)) {
-    const [created] = await supabaseRequest(env, 'POST', 'jobs', job)
-    await triggerRunpodJob(env, created)
-    return created
+    try {
+      const [created] = await supabaseRequest(env, 'POST', 'jobs', job)
+      await triggerRunpodJob(env, created)
+      return created
+    } catch (error) {
+      console.error('Supabase createJob error:', error)
+      jobs.set(job.id, job)
+      await triggerRunpodJob(env, job)
+      return job
+    }
   } else {
     jobs.set(job.id, job)
     await triggerRunpodJob(env, job)
@@ -189,8 +196,13 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
 
 async function getJob(env: Env, id: string): Promise<Job | null> {
   if (isSupabaseConfigured(env)) {
-    const jobsResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${id}`)
-    return jobsResult[0] || null
+    try {
+      const jobsResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${id}`)
+      return jobsResult[0] || null
+    } catch (error) {
+      console.error('Supabase getJob error:', error)
+      return jobs.get(id) || null
+    }
   } else {
     return jobs.get(id) || null
   }
@@ -198,7 +210,13 @@ async function getJob(env: Env, id: string): Promise<Job | null> {
 
 async function getUserJobs(env: Env, userId: string): Promise<Job[]> {
   if (isSupabaseConfigured(env)) {
-    return supabaseRequest(env, 'GET', 'jobs', null, `user_id=eq.${userId}&order=created_at.desc`)
+    try {
+      return supabaseRequest(env, 'GET', 'jobs', null, `user_id=eq.${userId}&order=created_at.desc`)
+    } catch (error) {
+      console.error('Supabase getUserJobs error:', error)
+      const userJobs = Array.from(jobs.values()).filter(job => job.user_id === userId)
+      return userJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    }
   } else {
     const userJobs = Array.from(jobs.values()).filter(job => job.user_id === userId)
     return userJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -212,8 +230,19 @@ async function updateJob(env: Env, id: string, updates: Partial<Job>): Promise<J
   }
 
   if (isSupabaseConfigured(env)) {
-    const [updated] = await supabaseRequest(env, 'PATCH', 'jobs', updateData, `id=eq.${id}`)
-    return updated
+    try {
+      const [updated] = await supabaseRequest(env, 'PATCH', 'jobs', updateData, `id=eq.${id}`)
+      return updated
+    } catch (error) {
+      console.error('Supabase updateJob error:', error)
+      const existingJob = jobs.get(id)
+      if (existingJob) {
+        const updatedJob = { ...existingJob, ...updateData }
+        jobs.set(id, updatedJob)
+        return updatedJob
+      }
+      throw new Error('Job not found')
+    }
   } else {
     const existingJob = jobs.get(id)
     if (existingJob) {
