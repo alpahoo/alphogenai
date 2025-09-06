@@ -183,6 +183,7 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
       return created
     } catch (error) {
       console.error('Supabase createJob error:', error)
+      // Fallback to in-memory storage if Supabase fails
       jobs.set(job.id, job)
       await triggerRunpodJob(env, job)
       return job
@@ -201,6 +202,7 @@ async function getJob(env: Env, id: string): Promise<Job | null> {
       return jobsResult[0] || null
     } catch (error) {
       console.error('Supabase getJob error:', error)
+      // Fallback to in-memory storage if Supabase fails
       return jobs.get(id) || null
     }
   } else {
@@ -214,6 +216,7 @@ async function getUserJobs(env: Env, userId: string): Promise<Job[]> {
       return supabaseRequest(env, 'GET', 'jobs', null, `user_id=eq.${userId}&order=created_at.desc`)
     } catch (error) {
       console.error('Supabase getUserJobs error:', error)
+      // Fallback to in-memory storage if Supabase fails
       const userJobs = Array.from(jobs.values()).filter(job => job.user_id === userId)
       return userJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     }
@@ -235,6 +238,7 @@ async function updateJob(env: Env, id: string, updates: Partial<Job>): Promise<J
       return updated
     } catch (error) {
       console.error('Supabase updateJob error:', error)
+      // Fallback to in-memory storage if Supabase fails
       const existingJob = jobs.get(id)
       if (existingJob) {
         const updatedJob = { ...existingJob, ...updateData }
