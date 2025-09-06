@@ -59,9 +59,13 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           if [ -n "$SUPABASE_DB_URL" ]; then
-            echo "Applying Supabase migrations..."
-            psql "$SUPABASE_DB_URL" -f supabase/migrations/001_initial_schema.sql
-            echo "Migrations applied successfully"
+            echo "⚠️ Supabase migrations must be applied manually due to IPv6/IPv4 connectivity limitations"
+            echo "GitHub Actions runners use IPv4 only, but Supabase PostgreSQL uses IPv6 only"
+            echo "Please apply supabase/migrations/001_initial_schema.sql via Supabase dashboard:"
+            echo "https://app.supabase.com/project/abpbvhycqgvgpjvficff/sql/new"
+            echo "See docs/supabase-migrations.md for detailed instructions"
+            echo "Migration content preview:"
+            head -20 supabase/migrations/001_initial_schema.sql
           else
             echo "SUPABASE_DB_URL not configured, skipping migrations"
           fi

@@ -4,19 +4,18 @@ This document provides instructions for applying database migrations to the Supa
 
 ## Manual Migration Process
 
-Since Supabase CLI is not configured in the CI/CD pipeline, migrations must be applied manually through the Supabase dashboard.
+**IMPORTANT**: Due to IPv6/IPv4 connectivity limitations, Supabase migrations cannot be applied automatically via GitHub Actions. GitHub Actions runners use IPv4 only, but Supabase PostgreSQL connections use IPv6 only, causing "Network is unreachable" errors.
 
 ### Steps to Apply Migrations
 
 1. **Access Supabase Dashboard**
-   - Go to https://app.supabase.com
-   - Navigate to your AlphoGenAI project
-   - Go to the SQL Editor
+   - Go to https://app.supabase.com/project/abpbvhycqgvgpjvficff
+   - Navigate to the SQL Editor: https://app.supabase.com/project/abpbvhycqgvgpjvficff/sql/new
 
 2. **Apply Initial Schema Migration**
    - Copy the contents of `supabase/migrations/001_initial_schema.sql`
    - Paste into the SQL Editor
-   - Execute the migration
+   - Execute the migration by clicking "Run"
 
 3. **Verify Tables Created**
    - Check that the following tables exist:
