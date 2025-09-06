@@ -418,7 +418,12 @@ async function handleJobs(request: Request, env: Env): Promise<Response> {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Failed to create job' }), {
+      console.error('Job creation error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      return new Response(JSON.stringify({ 
+        error: 'Failed to create job', 
+        details: errorMessage 
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -536,7 +541,12 @@ async function handleWebhooks(request: Request, env: Env): Promise<Response> {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Webhook processing failed' }), {
+      console.error('Webhook processing error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      return new Response(JSON.stringify({ 
+        error: 'Webhook processing failed', 
+        details: errorMessage 
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

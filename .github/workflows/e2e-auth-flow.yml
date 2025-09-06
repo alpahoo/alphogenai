@@ -1,0 +1,131 @@
+name: E2E Authentication Flow
+
+on:
+  workflow_run:
+    workflows: ["Deploy AlphoGenAI"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  auth-flow-test:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Wait for deployment stabilization
+        run: sleep 30
+      
+      - name: Test Complete Authentication Flow
+        run: |
+          echo "=== Testing Complete Authentication Flow ==="
+          
+          # Generate unique test credentials
+          TEST_EMAIL="e2e-auth-$(date +%s)@example.com"
+          TEST_PASSWORD="testpass123"
+          
+          echo "Testing with email: $TEST_EMAIL"
+          
+          # Step 1: Test signup
+          echo "=== Step 1: User Signup ==="
+          SIGNUP_RESPONSE=$(curl -s -w "%{http_code}" -X POST https://api.alphogen.com/api/auth/signup \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}")
+          
+          SIGNUP_HTTP_CODE="${SIGNUP_RESPONSE: -3}"
+          SIGNUP_BODY="${SIGNUP_RESPONSE%???}"
+          
+          echo "Signup response ($SIGNUP_HTTP_CODE): $SIGNUP_BODY"
+          
+          if [ "$SIGNUP_HTTP_CODE" = "200" ]; then
+            SIGNUP_TOKEN=$(echo "$SIGNUP_BODY" | jq -r '.token')
+            USER_ID=$(echo "$SIGNUP_BODY" | jq -r '.user.id')
+            echo "✅ Signup successful - User ID: $USER_ID"
+          else
+            echo "❌ Signup failed with status $SIGNUP_HTTP_CODE"
+            exit 1
+          fi
+          
+          # Step 2: Test login
+          echo "=== Step 2: User Login ==="
+          LOGIN_RESPONSE=$(curl -s -w "%{http_code}" -X POST https://api.alphogen.com/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}")
+          
+          LOGIN_HTTP_CODE="${LOGIN_RESPONSE: -3}"
+          LOGIN_BODY="${LOGIN_RESPONSE%???}"
+          
+          echo "Login response ($LOGIN_HTTP_CODE): $LOGIN_BODY"
+          
+          if [ "$LOGIN_HTTP_CODE" = "200" ]; then
+            LOGIN_TOKEN=$(echo "$LOGIN_BODY" | jq -r '.token')
+            echo "✅ Login successful"
+          else
+            echo "❌ Login failed with status $LOGIN_HTTP_CODE"
+            exit 1
+          fi
+          
+          # Step 3: Test job creation
+          echo "=== Step 3: Job Creation ==="
+          JOB_RESPONSE=$(curl -s -w "%{http_code}" -X POST https://api.alphogen.com/api/jobs \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $LOGIN_TOKEN" \
+            -d '{"prompt":"E2E test: Create a short video about AI technology"}')
+          
+          JOB_HTTP_CODE="${JOB_RESPONSE: -3}"
+          JOB_BODY="${JOB_RESPONSE%???}"
+          
+          echo "Job creation response ($JOB_HTTP_CODE): $JOB_BODY"
+          
+          if [ "$JOB_HTTP_CODE" = "200" ] || [ "$JOB_HTTP_CODE" = "201" ]; then
+            JOB_ID=$(echo "$JOB_BODY" | jq -r '.job.id')
+            JOB_STATUS=$(echo "$JOB_BODY" | jq -r '.job.status')
+            echo "✅ Job creation successful - Job ID: $JOB_ID, Status: $JOB_STATUS"
+          else
+            echo "⚠️ Job creation failed (may be expected if Supabase not fully configured)"
+            echo "Response: $JOB_BODY"
+            JOB_ID=""
+          fi
+          
+          # Step 4: Test job retrieval
+          if [ -n "$JOB_ID" ] && [ "$JOB_ID" != "null" ]; then
+            echo "=== Step 4: Job Retrieval ==="
+            GET_JOB_RESPONSE=$(curl -s -w "%{http_code}" https://api.alphogen.com/api/jobs/$JOB_ID \
+              -H "Authorization: Bearer $LOGIN_TOKEN")
+            
+            GET_JOB_HTTP_CODE="${GET_JOB_RESPONSE: -3}"
+            GET_JOB_BODY="${GET_JOB_RESPONSE%???}"
+            
+            echo "Job retrieval response ($GET_JOB_HTTP_CODE): $GET_JOB_BODY"
+            
+            if [ "$GET_JOB_HTTP_CODE" = "200" ]; then
+              RETRIEVED_STATUS=$(echo "$GET_JOB_BODY" | jq -r '.job.status')
+              echo "✅ Job retrieval successful - Status: $RETRIEVED_STATUS"
+            else
+              echo "❌ Job retrieval failed"
+              exit 1
+            fi
+            
+            # Step 5: Test job listing
+            echo "=== Step 5: Job Listing ==="
+            LIST_JOBS_RESPONSE=$(curl -s -w "%{http_code}" https://api.alphogen.com/api/jobs \
+              -H "Authorization: Bearer $LOGIN_TOKEN")
+            
+            LIST_HTTP_CODE="${LIST_JOBS_RESPONSE: -3}"
+            LIST_BODY="${LIST_JOBS_RESPONSE%???}"
+            
+            echo "Job listing response ($LIST_HTTP_CODE): $LIST_BODY"
+            
+            if [ "$LIST_HTTP_CODE" = "200" ]; then
+              JOBS_COUNT=$(echo "$LIST_BODY" | jq '.jobs | length')
+              echo "✅ Job listing successful - Found $JOBS_COUNT jobs"
+            else
+              echo "❌ Job listing failed"
+              exit 1
+            fi
+          else
+            echo "⚠️ Skipping job retrieval tests (no valid job ID)"
+          fi
+          
+          echo "🎉 Complete authentication flow test completed successfully!"

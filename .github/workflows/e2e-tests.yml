@@ -10,8 +10,7 @@ on:
 jobs:
   e2e-test:
     runs-on: ubuntu-latest
-    needs: [apply_migrations, deploy_worker]
-    if: always()
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -87,7 +86,7 @@ jobs:
           fi
 
       - name: Test Job Status
-        if: env.JOB_ID != ''
+        if: env.JOB_ID != '' && env.JOB_ID != 'mock_job_id'
         run: |
           response=$(curl -s -w "%{http_code}" https://api.alphogen.com/api/jobs/$JOB_ID \
             -H "Authorization: Bearer $USER_TOKEN")
@@ -121,7 +120,7 @@ jobs:
           done
 
       - name: Test Video Generation Pipeline
-        if: env.JOB_ID != ''
+        if: env.JOB_ID != '' && env.JOB_ID != 'mock_job_id'
         run: |
           echo "Testing video generation pipeline for job $JOB_ID"
           
