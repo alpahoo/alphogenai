@@ -725,7 +725,7 @@ export default {
           timestamp: new Date().toISOString(),
           version: '1.0.0',
           supabase_configured: isSupabaseConfigured(env),
-          runpod_configured: !!(env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID),
+          runner_configured: !!(env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID),
           jwt_configured: isJWTConfigured(env)
         }), {
           status: 200,
