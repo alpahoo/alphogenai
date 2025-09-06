@@ -54,9 +54,9 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          curl -fsSL https://cli.supabase.com/install/linux | sh
-          echo "$HOME/.supabase/bin" >> $GITHUB_PATH
-          $HOME/.supabase/bin/supabase db execute \
+          curl -fsSL "https://github.com/supabase/cli/releases/download/v2.39.2/supabase_linux_amd64.tar.gz" -o supabase.tar.gz
+          tar -xzf supabase.tar.gz
+          ./supabase db execute \
             --project-ref "$SUPABASE_PROJECT_REF" \
             --access-token "$SUPABASE_ACCESS_TOKEN" \
             --file supabase/migrations/001_initial_schema.sql
