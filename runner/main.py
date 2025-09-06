@@ -107,23 +107,46 @@ class VideoGenerator:
             })
     
     def generate_video_scenes(self, prompt: str) -> list:
-        """Generate video scenes using WAN 2.2+ API"""
+        """Generate video scenes using WAN 2.2+ API with fallback to mock"""
         if self.wan_api_key == 'mock-key':
             logger.info("Using mock WAN 2.2+ implementation")
             return self._generate_mock_scenes()
         
-        logger.info("Calling WAN 2.2+ API")
+        logger.info("Calling WAN 2.2+ API for video generation")
         scenes = []
-        
         scene_prompts = self._split_prompt_into_scenes(prompt)
         
         for i, scene_prompt in enumerate(scene_prompts):
             try:
-                # response = requests.post(
-                # )
+                response = requests.post(
+                    "https://api.wan.com/v2/text-to-video",
+                    headers={
+                        "Authorization": f"Bearer {self.wan_api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "prompt": scene_prompt,
+                        "duration": 30,  # 30 seconds per scene
+                        "resolution": "1080p",
+                        "fps": 24,
+                        "style": "realistic",
+                        "format": "mp4"
+                    },
+                    timeout=600  # 10 minutes for video generation
+                )
                 
-                scene_file = self._generate_mock_scene(i, scene_prompt)
-                scenes.append(scene_file)
+                if response.status_code == 200:
+                    result = response.json()
+                    video_url = result.get("video_url") or result.get("download_url")
+                    if video_url:
+                        scene_file = f"/tmp/scene_{i}_real.mp4"
+                        self._download_file(video_url, scene_file)
+                        scenes.append(scene_file)
+                        logger.info(f"Generated scene {i+1}/{len(scene_prompts)} with WAN 2.2+")
+                    else:
+                        raise Exception("No video URL in WAN 2.2+ response")
+                else:
+                    raise Exception(f"WAN 2.2+ API error: {response.status_code}")
                 
             except Exception as e:
                 logger.error(f"WAN 2.2+ API error for scene {i}: {e}")
@@ -131,6 +154,17 @@ class VideoGenerator:
                 scenes.append(scene_file)
         
         return scenes
+    
+    def _download_file(self, url: str, local_path: str):
+        """Download file from URL to local path"""
+        response = requests.get(url, stream=True, timeout=300)
+        response.raise_for_status()
+        
+        with open(local_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        
+        logger.info(f"Downloaded file: {local_path}")
     
     def _split_prompt_into_scenes(self, prompt: str) -> list:
         """Split main prompt into 3 scene descriptions"""
@@ -164,21 +198,54 @@ class VideoGenerator:
         return scene_file
     
     def generate_narration(self, prompt: str) -> str:
-        """Generate narration using Qwen-TTS API"""
+        """Generate narration using Qwen-TTS API with fallback to mock"""
         if self.qwen_api_key == 'mock-key':
             logger.info("Using mock Qwen-TTS implementation")
             return self._generate_mock_narration()
         
-        logger.info("Calling Qwen-TTS API")
+        logger.info("Calling Qwen-TTS API for narration generation")
         
         try:
             narration_text = self._create_narration_script(prompt)
             
-            # response = requests.post(
-            #     }
-            # )
+            response = requests.post(
+                "https://api.qwen.com/v1/audio/speech",
+                headers={
+                    "Authorization": f"Bearer {self.qwen_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "qwen-tts-v1",
+                    "input": narration_text,
+                    "voice": "professional_male",
+                    "response_format": "mp3",
+                    "speed": 1.0,
+                    "pitch": 0.0,
+                    "volume": 0.8
+                },
+                timeout=180  # 3 minutes for TTS generation
+            )
             
-            return self._generate_mock_narration()
+            if response.status_code == 200:
+                content_type = response.headers.get('content-type', '')
+                if 'application/json' in content_type:
+                    result = response.json()
+                    audio_url = result.get("audio_url") or result.get("url")
+                    if audio_url:
+                        narration_file = "/tmp/narration_real.mp3"
+                        self._download_file(audio_url, narration_file)
+                        logger.info("Generated narration with Qwen-TTS")
+                        return narration_file
+                elif 'audio/' in content_type:
+                    narration_file = "/tmp/narration_real.mp3"
+                    with open(narration_file, 'wb') as f:
+                        f.write(response.content)
+                    logger.info("Generated narration with Qwen-TTS")
+                    return narration_file
+                
+                raise Exception("No audio content in Qwen-TTS response")
+            else:
+                raise Exception(f"Qwen-TTS API error: {response.status_code}")
             
         except Exception as e:
             logger.error(f"Qwen-TTS API error: {e}")

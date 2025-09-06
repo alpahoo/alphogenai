@@ -1,6 +1,9 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
+const users = new Map<string, User>()
+const jobs = new Map<string, Job>()
+
 interface Env {
   R2_BUCKET: R2Bucket
   JWT_SECRET: string
@@ -60,14 +63,15 @@ function verifyToken(token: string, secret: string): { userId: string } | null {
   }
 }
 
-const users = new Map()
-const jobs = new Map()
-
 function isSupabaseConfigured(env: Env): boolean {
   return !!(env.SUPABASE_URL && 
          env.SUPABASE_SERVICE_ROLE && 
          env.SUPABASE_URL !== 'your_supabase_url' &&
          env.SUPABASE_SERVICE_ROLE !== 'your_supabase_service_role_key')
+}
+
+function isJWTConfigured(env: Env): boolean {
+  return !!(env.JWT_SECRET && env.JWT_SECRET.length > 0)
 }
 
 async function supabaseRequest(env: Env, method: string, table: string, data?: any, filters?: string): Promise<any> {
@@ -79,6 +83,10 @@ async function supabaseRequest(env: Env, method: string, table: string, data?: a
     'Content-Type': 'application/json',
     'Prefer': 'return=representation'
   }
+  
+  console.log(`DEBUG: Supabase request headers - apikey: ${env.SUPABASE_SERVICE_ROLE?.substring(0, 20)}..., Authorization: Bearer ${env.SUPABASE_SERVICE_ROLE?.substring(0, 20)}...`)
+
+  console.log(`DEBUG: Supabase ${method} ${table} with service_role auth`)
 
   const options: RequestInit = {
     method,
@@ -92,7 +100,11 @@ async function supabaseRequest(env: Env, method: string, table: string, data?: a
   const response = await fetch(url, options)
   
   if (!response.ok) {
-    throw new Error(`Supabase error: ${response.status} ${await response.text()}`)
+    const errorText = await response.text()
+    console.error(`Supabase ${method} ${table} failed:`, response.status, response.statusText, errorText)
+    console.error(`Request URL: ${url}`)
+    console.error(`Request headers:`, headers)
+    throw new Error(`Supabase error: ${response.status} ${response.statusText}`)
   }
 
   return response.json()
@@ -107,41 +119,99 @@ async function createUser(env: Env, email: string, passwordHash: string): Promis
     updated_at: new Date().toISOString(),
   }
 
+  console.log(`DEBUG: Creating user ${email} with service_role auth`)
+  console.log(`DEBUG: Password hash length: ${passwordHash.length}`)
+  console.log(`DEBUG: Generated user ID: ${user.id}`)
+
   if (isSupabaseConfigured(env)) {
     try {
+      console.log(`DEBUG: Attempting to create user in Supabase with service_role`)
       const [created] = await supabaseRequest(env, 'POST', 'users', user)
+      console.log(`DEBUG: User created successfully in Supabase: ${created.id}`)
+      console.log(`DEBUG: Supabase returned user email: ${created.email}`)
+      console.log(`DEBUG: Supabase returned password_hash length: ${created.password_hash?.length}`)
+      
+      users.set(created.id, created)
+      console.log(`DEBUG: User also stored in memory for consistency`)
+      
       return created
     } catch (error) {
       console.error('Supabase createUser error:', error)
+      console.log(`DEBUG: Falling back to in-memory storage for user creation`)
+      // Fallback to in-memory storage if Supabase fails
       users.set(user.id, user)
       return user
     }
   } else {
+    console.log(`DEBUG: Supabase not configured, storing user in memory`)
     users.set(user.id, user)
     return user
   }
 }
 
 async function getUserByEmail(env: Env, email: string): Promise<User | null> {
+  console.log(`DEBUG: getUserByEmail called for: ${email}`)
+  console.log(`DEBUG: In-memory users count: ${users.size}`)
+  console.log(`DEBUG: Supabase configured: ${isSupabaseConfigured(env)}`)
+  console.log(`DEBUG: SUPABASE_URL: ${env.SUPABASE_URL?.substring(0, 50)}...`)
+  console.log(`DEBUG: SUPABASE_SERVICE_ROLE: ${env.SUPABASE_SERVICE_ROLE?.substring(0, 20)}...`)
+  
   if (isSupabaseConfigured(env)) {
     try {
+      console.log(`DEBUG: Getting user by email from Supabase: ${email}`)
+      console.log(`DEBUG: Query URL: ${env.SUPABASE_URL}/rest/v1/users?email=eq.${email}`)
+      
       const usersResult = await supabaseRequest(env, 'GET', 'users', null, `email=eq.${email}`)
-      return usersResult[0] || null
+      console.log(`DEBUG: Supabase query returned ${usersResult?.length || 0} users for email ${email}`)
+      console.log(`DEBUG: Raw Supabase response:`, JSON.stringify(usersResult))
+      
+      if (usersResult && usersResult.length > 0) {
+        const user = usersResult[0]
+        console.log(`DEBUG: Found user in Supabase: ${user.id}, email: ${user.email}`)
+        console.log(`DEBUG: Supabase user password_hash length: ${user.password_hash?.length}`)
+        console.log(`DEBUG: Supabase user password_hash starts with: ${user.password_hash?.substring(0, 10)}...`)
+        
+        users.set(user.id, user)
+        console.log(`DEBUG: User cached in memory for future lookups`)
+        
+        return user
+      } else {
+        console.log(`DEBUG: No user found in Supabase with email ${email}`)
+        console.log(`DEBUG: Checking if user exists in in-memory storage...`)
+        for (const user of users.values()) {
+          if (user.email === email) {
+            console.log(`DEBUG: Found user in in-memory storage: ${user.id}`)
+            console.log(`DEBUG: In-memory user password_hash length: ${user.password_hash?.length}`)
+            return user
+          }
+        }
+        console.log(`DEBUG: User not found in either Supabase or in-memory storage`)
+        return null
+      }
     } catch (error) {
       console.error('Supabase getUserByEmail error:', error)
+      console.log(`DEBUG: Supabase error details:`, (error as Error).message || error)
+      console.log(`DEBUG: Falling back to in-memory storage for email ${email}`)
+      
       for (const user of users.values()) {
         if (user.email === email) {
+          console.log(`DEBUG: Found user in in-memory storage after Supabase error: ${user.id}`)
+          console.log(`DEBUG: In-memory user password_hash length: ${user.password_hash?.length}`)
           return user
         }
       }
+      console.log(`DEBUG: User not found in in-memory storage either`)
       return null
     }
   } else {
+    console.log(`DEBUG: Supabase not configured, checking in-memory storage for email ${email}`)
     for (const user of users.values()) {
       if (user.email === email) {
+        console.log(`DEBUG: Found user in in-memory storage: ${user.id}`)
         return user
       }
     }
+    console.log(`DEBUG: User not found in in-memory storage`)
     return null
   }
 }
@@ -168,11 +238,36 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
     updated_at: new Date().toISOString(),
   }
 
+  console.log(`DEBUG: createJob called for user ${userId}, generated job ID: ${job.id}`)
+  console.log(`DEBUG: Supabase configured: ${isSupabaseConfigured(env)}`)
+
   if (isSupabaseConfigured(env)) {
-    const [created] = await supabaseRequest(env, 'POST', 'jobs', job)
-    await triggerRunpodJob(env, created)
-    return created
+    try {
+      console.log(`DEBUG: Creating job in Supabase for user ${userId}, job ID: ${job.id}`)
+      console.log(`DEBUG: Job payload:`, JSON.stringify(job))
+      
+      const [created] = await supabaseRequest(env, 'POST', 'jobs', job)
+      console.log(`DEBUG: Job created successfully in Supabase: ${created.id}`)
+      console.log(`DEBUG: Created job details:`, JSON.stringify(created))
+      
+      jobs.set(created.id, created)
+      console.log(`DEBUG: Job ${created.id} also cached in memory for immediate access`)
+      
+      await triggerRunpodJob(env, created)
+      return created
+    } catch (error) {
+      console.error('Supabase createJob error:', error)
+      console.log(`DEBUG: Supabase createJob error details:`, (error as Error).message || error)
+      console.log(`DEBUG: Falling back to in-memory storage for job ${job.id}`)
+      
+      jobs.set(job.id, job)
+      console.log(`DEBUG: Job ${job.id} stored in in-memory fallback`)
+      
+      await triggerRunpodJob(env, job)
+      return job
+    }
   } else {
+    console.log(`DEBUG: Supabase not configured, storing job ${job.id} in-memory`)
     jobs.set(job.id, job)
     await triggerRunpodJob(env, job)
     return job
@@ -180,17 +275,72 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
 }
 
 async function getJob(env: Env, id: string): Promise<Job | null> {
+  console.log(`DEBUG: getJob called for ID: ${id}`)
+  console.log(`DEBUG: In-memory jobs count: ${jobs.size}`)
+  console.log(`DEBUG: Supabase configured: ${isSupabaseConfigured(env)}`)
+  console.log(`DEBUG: SUPABASE_URL: ${env.SUPABASE_URL?.substring(0, 50)}...`)
+  console.log(`DEBUG: SUPABASE_SERVICE_ROLE: ${env.SUPABASE_SERVICE_ROLE?.substring(0, 20)}...`)
+  
   if (isSupabaseConfigured(env)) {
-    const jobsResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${id}`)
-    return jobsResult[0] || null
+    try {
+      console.log(`DEBUG: Getting job from Supabase by ID: ${id} with service_role auth`)
+      console.log(`DEBUG: Query URL: ${env.SUPABASE_URL}/rest/v1/jobs?id=eq.${id}`)
+      
+      const jobsResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${id}`)
+      console.log(`DEBUG: Supabase query returned ${jobsResult?.length || 0} jobs for ID ${id}`)
+      console.log(`DEBUG: Raw Supabase response:`, JSON.stringify(jobsResult))
+      
+      if (jobsResult && jobsResult.length > 0) {
+        const job = jobsResult[0]
+        console.log(`DEBUG: Found job in Supabase: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
+        
+        jobs.set(job.id, job)
+        console.log(`DEBUG: Job cached in memory for future lookups`)
+        
+        return job
+      } else {
+        console.log(`DEBUG: No job found in Supabase with ID ${id}`)
+        console.log(`DEBUG: Checking if job exists in in-memory storage...`)
+        const job = jobs.get(id) || null
+        console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage`)
+        if (job) {
+          console.log(`DEBUG: In-memory job details: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
+        }
+        return job
+      }
+    } catch (error) {
+      console.error('Supabase getJob error:', error)
+      console.log(`DEBUG: Supabase error details:`, (error as Error).message || error)
+      console.log(`DEBUG: Falling back to in-memory storage for job ${id}`)
+      
+      const job = jobs.get(id) || null
+      console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage after Supabase error`)
+      if (job) {
+        console.log(`DEBUG: In-memory job details: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
+      }
+      return job
+    }
   } else {
-    return jobs.get(id) || null
+    console.log(`DEBUG: Supabase not configured, checking in-memory storage for job ${id}`)
+    const job = jobs.get(id) || null
+    console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage`)
+    if (job) {
+      console.log(`DEBUG: In-memory job details: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
+    }
+    return job
   }
 }
 
 async function getUserJobs(env: Env, userId: string): Promise<Job[]> {
   if (isSupabaseConfigured(env)) {
-    return supabaseRequest(env, 'GET', 'jobs', null, `user_id=eq.${userId}&order=created_at.desc`)
+    try {
+      return supabaseRequest(env, 'GET', 'jobs', null, `user_id=eq.${userId}&order=created_at.desc`)
+    } catch (error) {
+      console.error('Supabase getUserJobs error:', error)
+      // Fallback to in-memory storage if Supabase fails
+      const userJobs = Array.from(jobs.values()).filter(job => job.user_id === userId)
+      return userJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    }
   } else {
     const userJobs = Array.from(jobs.values()).filter(job => job.user_id === userId)
     return userJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -204,8 +354,20 @@ async function updateJob(env: Env, id: string, updates: Partial<Job>): Promise<J
   }
 
   if (isSupabaseConfigured(env)) {
-    const [updated] = await supabaseRequest(env, 'PATCH', 'jobs', updateData, `id=eq.${id}`)
-    return updated
+    try {
+      const [updated] = await supabaseRequest(env, 'PATCH', 'jobs', updateData, `id=eq.${id}`)
+      return updated
+    } catch (error) {
+      console.error('Supabase updateJob error:', error)
+      // Fallback to in-memory storage if Supabase fails
+      const existingJob = jobs.get(id)
+      if (existingJob) {
+        const updatedJob = { ...existingJob, ...updateData }
+        jobs.set(id, updatedJob)
+        return updatedJob
+      }
+      throw new Error('Job not found')
+    }
   } else {
     const existingJob = jobs.get(id)
     if (existingJob) {
@@ -285,7 +447,9 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Failed to create user' }), {
+      console.error('Signup error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      return new Response(JSON.stringify({ error: 'Failed to create user', details: errorMessage }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -305,15 +469,29 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
     try {
       const user = await getUserByEmail(env, email)
       if (!user) {
-        return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+        console.log(`DEBUG: User not found for email ${email}`)
+        return new Response(JSON.stringify({ 
+          error: 'Invalid credentials',
+          debug: 'User not found in database'
+        }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
+      console.log(`DEBUG: Verifying password for user ${user.id}`)
+      console.log(`DEBUG: Stored hash: ${user.password_hash?.substring(0, 20)}...`)
+      console.log(`DEBUG: Input password length: ${password.length}`)
+      console.log(`DEBUG: Hash algorithm check: ${user.password_hash?.startsWith('$2b$') ? 'bcrypt' : 'unknown'}`)
       const isValid = await verifyPassword(password, user.password_hash)
+      console.log(`DEBUG: Password verification result: ${isValid}`)
       if (!isValid) {
-        return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+        console.log(`DEBUG: Password verification failed for user ${user.email}`)
+        console.log(`DEBUG: This suggests either hash mismatch or RLS blocking service_role access`)
+        return new Response(JSON.stringify({ 
+          error: 'Invalid credentials',
+          debug: `Password verification failed. Hash starts with: ${user.password_hash?.substring(0, 10)}..., Algorithm: ${user.password_hash?.startsWith('$2b$') ? 'bcrypt' : 'unknown'}`
+        }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -328,7 +506,9 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Login failed' }), {
+      console.error('Login error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      return new Response(JSON.stringify({ error: 'Login failed', details: errorMessage }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -377,7 +557,12 @@ async function handleJobs(request: Request, env: Env): Promise<Response> {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Failed to create job' }), {
+      console.error('Job creation error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      return new Response(JSON.stringify({ 
+        error: 'Failed to create job', 
+        details: errorMessage 
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -400,28 +585,42 @@ async function handleJobs(request: Request, env: Env): Promise<Response> {
 
   if (request.method === 'GET' && path.startsWith('/api/jobs/')) {
     const jobId = path.split('/')[3]
+    console.log(`DEBUG: GET /api/jobs/${jobId} requested by user ${userId}`)
     
     try {
       const job = await getJob(env, jobId)
+      console.log(`DEBUG: getJob returned: ${job ? 'job found' : 'job not found'}`)
+      
       if (!job) {
-        return new Response(JSON.stringify({ error: 'Job not found' }), {
+        console.log(`DEBUG: Returning 404 - job ${jobId} not found`)
+        return new Response(JSON.stringify({ 
+          error: 'Job not found',
+          debug: `Job ${jobId} not found in database or memory storage`
+        }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
+      console.log(`DEBUG: Job found - checking ownership: job.user_id=${job.user_id}, userId=${userId}`)
       if (job.user_id !== userId) {
+        console.log(`DEBUG: Returning 403 - user ${userId} cannot access job owned by ${job.user_id}`)
         return new Response(JSON.stringify({ error: 'Forbidden' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
+      console.log(`DEBUG: Returning job ${jobId} successfully`)
       return new Response(JSON.stringify({ job }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Failed to fetch job' }), {
+      console.error(`DEBUG: Error in GET /api/jobs/${jobId}:`, error)
+      return new Response(JSON.stringify({ 
+        error: 'Failed to fetch job',
+        debug: error instanceof Error ? error.message : 'Unknown error'
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -495,7 +694,12 @@ async function handleWebhooks(request: Request, env: Env): Promise<Response> {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Webhook processing failed' }), {
+      console.error('Webhook processing error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      return new Response(JSON.stringify({ 
+        error: 'Webhook processing failed', 
+        details: errorMessage 
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -521,7 +725,8 @@ export default {
           timestamp: new Date().toISOString(),
           version: '1.0.0',
           supabase_configured: isSupabaseConfigured(env),
-          runpod_configured: !!(env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID)
+          runpod_configured: !!(env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID),
+          jwt_configured: isJWTConfigured(env)
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

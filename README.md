@@ -242,3 +242,4 @@ For issues and questions:
 - GitHub Issues: https://github.com/alpahoo/alphogenai/issues
 - Documentation: See README sections above
 - API Status: https://api.alphogen.com/health
+# Trigger migrations for new Supabase project abpbvhycqgvgpjvficff
