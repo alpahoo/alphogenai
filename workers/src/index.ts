@@ -116,14 +116,17 @@ async function createUser(env: Env, email: string, passwordHash: string): Promis
   if (isSupabaseConfigured(env)) {
     try {
       const [created] = await supabaseRequest(env, 'POST', 'users', user)
+      console.log('Supabase createUser success:', created.id)
       return created
     } catch (error) {
       console.error('Supabase createUser error:', error)
       // Fallback to in-memory storage if Supabase fails
+      console.log('Falling back to in-memory storage for createUser')
       users.set(user.id, user)
       return user
     }
   } else {
+    console.log('Supabase not configured, using in-memory storage for createUser')
     users.set(user.id, user)
     return user
   }
@@ -133,18 +136,23 @@ async function getUserByEmail(env: Env, email: string): Promise<User | null> {
   if (isSupabaseConfigured(env)) {
     try {
       const usersResult = await supabaseRequest(env, 'GET', 'users', null, `email=eq.${email}`)
+      console.log('Supabase getUserByEmail result:', usersResult.length > 0 ? 'found' : 'not found')
       return usersResult[0] || null
     } catch (error) {
       console.error('Supabase getUserByEmail error:', error)
       // Fallback to in-memory storage if Supabase fails
+      console.log('Falling back to in-memory storage for getUserByEmail')
       for (const user of users.values()) {
         if (user.email === email) {
+          console.log('Found user in in-memory storage')
           return user
         }
       }
+      console.log('User not found in in-memory storage either')
       return null
     }
   } else {
+    console.log('Supabase not configured, using in-memory storage')
     for (const user of users.values()) {
       if (user.email === email) {
         return user
