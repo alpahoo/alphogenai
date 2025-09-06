@@ -553,6 +553,25 @@ async function handleJobs(request: Request, env: Env): Promise<Response> {
 
     try {
       const job = await createJob(env, userId, prompt)
+      
+      console.log(`DIAGNOSTIC POST /api/jobs: Created job ${job.id} for user ${userId}`)
+      console.log(`DIAGNOSTIC POST /api/jobs: Attempting immediate verification...`)
+      
+      if (isSupabaseConfigured(env)) {
+        try {
+          const verifyResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${job.id}`)
+          console.log(`DIAGNOSTIC POST /api/jobs: Verification query returned ${verifyResult?.length || 0} rows`)
+          if (verifyResult && verifyResult.length > 0) {
+            const verifiedJob = verifyResult[0]
+            console.log(`DIAGNOSTIC POST /api/jobs: Verified job exists - id: ${verifiedJob.id}, user_id: ${verifiedJob.user_id}`)
+          } else {
+            console.log(`DIAGNOSTIC POST /api/jobs: WARNING - Job ${job.id} not found in immediate verification!`)
+          }
+        } catch (verifyError) {
+          console.log(`DIAGNOSTIC POST /api/jobs: Verification query failed:`, verifyError)
+        }
+      }
+      
       return new Response(JSON.stringify({ job }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -585,14 +604,39 @@ async function handleJobs(request: Request, env: Env): Promise<Response> {
 
   if (request.method === 'GET' && path.startsWith('/api/jobs/')) {
     const jobId = path.split('/')[3]
-    console.log(`DEBUG: GET /api/jobs/${jobId} requested by user ${userId}`)
+    
+    const authHeader = request.headers.get('Authorization')
+    console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: job_id=${jobId}, jwt_sub=${userId}, auth_header_present=${!!authHeader}`)
+    console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: query_user_id_used=${userId}`)
     
     try {
       const job = await getJob(env, jobId)
-      console.log(`DEBUG: getJob returned: ${job ? 'job found' : 'job not found'}`)
+      console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: rows_found=${job ? 1 : 0}`)
+      
+      if (job) {
+        console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Found job - user_id=${job.user_id}, status=${job.status}, created_at=${job.created_at}`)
+        console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Ownership check - job.user_id=${job.user_id} === jwt_sub=${userId} ? ${job.user_id === userId}`)
+      }
       
       if (!job) {
-        console.log(`DEBUG: Returning 404 - job ${jobId} not found`)
+        console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Job not found - checking if it exists without user filter...`)
+        
+        if (isSupabaseConfigured(env)) {
+          try {
+            const allJobsResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${jobId}`)
+            console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Unfiltered query returned ${allJobsResult?.length || 0} rows`)
+            if (allJobsResult && allJobsResult.length > 0) {
+              const foundJob = allJobsResult[0]
+              console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Job EXISTS but filtered out - actual_user_id=${foundJob.user_id}, requesting_user_id=${userId}`)
+              console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: This indicates a user_id mismatch issue`)
+            } else {
+              console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Job does NOT exist in database at all`)
+            }
+          } catch (diagError) {
+            console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Diagnostic query failed:`, diagError)
+          }
+        }
+        
         return new Response(JSON.stringify({ 
           error: 'Job not found',
           debug: `Job ${jobId} not found in database or memory storage`
@@ -602,16 +646,15 @@ async function handleJobs(request: Request, env: Env): Promise<Response> {
         })
       }
 
-      console.log(`DEBUG: Job found - checking ownership: job.user_id=${job.user_id}, userId=${userId}`)
       if (job.user_id !== userId) {
-        console.log(`DEBUG: Returning 403 - user ${userId} cannot access job owned by ${job.user_id}`)
+        console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Ownership mismatch - job.user_id=${job.user_id}, jwt_sub=${userId}`)
         return new Response(JSON.stringify({ error: 'Forbidden' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      console.log(`DEBUG: Returning job ${jobId} successfully`)
+      console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Returning job successfully`)
       return new Response(JSON.stringify({ job }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
