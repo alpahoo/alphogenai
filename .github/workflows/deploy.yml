@@ -59,23 +59,10 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_PROJECT_REF" ]; then
-            echo "🚀 Applying Supabase migrations via CLI API..."
-            echo "Project: $SUPABASE_PROJECT_REF"
-            echo "Migration file: supabase/migrations/001_initial_schema.sql"
-            
-            supabase db execute \
-              --project-ref "$SUPABASE_PROJECT_REF" \
-              --access-token "$SUPABASE_ACCESS_TOKEN" \
-              --file supabase/migrations/001_initial_schema.sql
-            
-            echo "✅ Migration applied successfully via Supabase API"
-          else
-            echo "⚠️ SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF not configured"
-            echo "Skipping migrations - please configure these secrets:"
-            echo "- SUPABASE_ACCESS_TOKEN: Personal access token from Supabase dashboard"
-            echo "- SUPABASE_PROJECT_REF: abpbvhycqgvgpjvficff"
-          fi
+          supabase db execute \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --access-token "$SUPABASE_ACCESS_TOKEN" \
+            --file supabase/migrations/001_initial_schema.sql
 
   deploy_worker:
     runs-on: ubuntu-latest
