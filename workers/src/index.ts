@@ -252,15 +252,32 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
 }
 
 async function getJob(env: Env, id: string): Promise<Job | null> {
+  console.log(`DEBUG: getJob called for ID: ${id}`)
+  console.log(`DEBUG: In-memory jobs count: ${jobs.size}`)
+  
   if (isSupabaseConfigured(env)) {
     try {
-      console.log(`DEBUG: Getting job from Supabase by ID: ${id}`)
+      console.log(`DEBUG: Getting job from Supabase by ID: ${id} with service_role auth`)
       const jobsResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${id}`)
-      console.log(`DEBUG: Found ${jobsResult?.length || 0} jobs in Supabase for ID ${id}`)
-      return jobsResult[0] || null
+      console.log(`DEBUG: Supabase query returned ${jobsResult?.length || 0} jobs for ID ${id}`)
+      
+      if (jobsResult && jobsResult.length > 0) {
+        const job = jobsResult[0]
+        console.log(`DEBUG: Found job in Supabase: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
+        
+        jobs.set(job.id, job)
+        console.log(`DEBUG: Job cached in memory for future lookups`)
+        
+        return job
+      } else {
+        console.log(`DEBUG: No job found in Supabase, checking in-memory storage`)
+        const job = jobs.get(id) || null
+        console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage`)
+        return job
+      }
     } catch (error) {
       console.error('Supabase getJob error:', error)
-      console.log(`DEBUG: Falling back to in-memory storage for job ${id}`)
+      console.log(`DEBUG: Supabase error, falling back to in-memory storage for job ${id}`)
       // Fallback to in-memory storage if Supabase fails
       const job = jobs.get(id) || null
       console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage`)
@@ -528,28 +545,42 @@ async function handleJobs(request: Request, env: Env): Promise<Response> {
 
   if (request.method === 'GET' && path.startsWith('/api/jobs/')) {
     const jobId = path.split('/')[3]
+    console.log(`DEBUG: GET /api/jobs/${jobId} requested by user ${userId}`)
     
     try {
       const job = await getJob(env, jobId)
+      console.log(`DEBUG: getJob returned: ${job ? 'job found' : 'job not found'}`)
+      
       if (!job) {
-        return new Response(JSON.stringify({ error: 'Job not found' }), {
+        console.log(`DEBUG: Returning 404 - job ${jobId} not found`)
+        return new Response(JSON.stringify({ 
+          error: 'Job not found',
+          debug: `Job ${jobId} not found in database or memory storage`
+        }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
+      console.log(`DEBUG: Job found - checking ownership: job.user_id=${job.user_id}, userId=${userId}`)
       if (job.user_id !== userId) {
+        console.log(`DEBUG: Returning 403 - user ${userId} cannot access job owned by ${job.user_id}`)
         return new Response(JSON.stringify({ error: 'Forbidden' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
+      console.log(`DEBUG: Returning job ${jobId} successfully`)
       return new Response(JSON.stringify({ job }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Failed to fetch job' }), {
+      console.error(`DEBUG: Error in GET /api/jobs/${jobId}:`, error)
+      return new Response(JSON.stringify({ 
+        error: 'Failed to fetch job',
+        debug: error instanceof Error ? error.message : 'Unknown error'
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
