@@ -316,7 +316,9 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
       }
 
       const passwordHash = await hashPassword(password)
+      console.log('Signup: Creating user with email:', email, 'Hash length:', passwordHash.length)
       const user = await createUser(env, email, passwordHash)
+      console.log('Signup: User created with ID:', user.id)
       const token = generateToken(user.id, env.JWT_SECRET)
 
       return new Response(JSON.stringify({
@@ -348,14 +350,19 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
     try {
       const user = await getUserByEmail(env, email)
       if (!user) {
+        console.error('Login failed: User not found for email:', email)
         return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
+      console.log('Login: Found user for email:', email, 'User ID:', user.id)
       const isValid = await verifyPassword(password, user.password_hash)
+      console.log('Login: Password verification result:', isValid)
+      
       if (!isValid) {
+        console.error('Login failed: Invalid password for email:', email)
         return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
