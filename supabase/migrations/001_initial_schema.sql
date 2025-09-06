@@ -30,14 +30,12 @@ ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
 -- Service role policies for Worker API access
 CREATE POLICY "Service role full access users" ON public.users
     FOR ALL USING (
-        current_setting('request.jwt.claims', true)::json->>'role' = 'service_role'
-        OR current_setting('request.headers', true)::json->>'authorization' LIKE 'Bearer %'
+        auth.role() = 'service_role'
     );
 
 CREATE POLICY "Service role full access jobs" ON public.jobs
     FOR ALL USING (
-        current_setting('request.jwt.claims', true)::json->>'role' = 'service_role'
-        OR current_setting('request.headers', true)::json->>'authorization' LIKE 'Bearer %'
+        auth.role() = 'service_role'
     );
 
 CREATE POLICY "Users can view own data" ON public.users
