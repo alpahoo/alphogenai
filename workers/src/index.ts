@@ -119,17 +119,24 @@ async function createUser(env: Env, email: string, passwordHash: string): Promis
     updated_at: new Date().toISOString(),
   }
 
+  console.log(`DEBUG: Creating user ${email} with service_role auth`)
+  console.log(`DEBUG: Password hash length: ${passwordHash.length}`)
+
   if (isSupabaseConfigured(env)) {
     try {
+      console.log(`DEBUG: Attempting to create user in Supabase with service_role`)
       const [created] = await supabaseRequest(env, 'POST', 'users', user)
+      console.log(`DEBUG: User created successfully in Supabase: ${created.id}`)
       return created
     } catch (error) {
       console.error('Supabase createUser error:', error)
+      console.log(`DEBUG: Falling back to in-memory storage for user creation`)
       // Fallback to in-memory storage if Supabase fails
       users.set(user.id, user)
       return user
     }
   } else {
+    console.log(`DEBUG: Supabase not configured, storing user in memory`)
     users.set(user.id, user)
     return user
   }
@@ -382,10 +389,13 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
 
       console.log(`DEBUG: Verifying password for user ${user.id}`)
       console.log(`DEBUG: Stored hash: ${user.password_hash?.substring(0, 20)}...`)
+      console.log(`DEBUG: Input password length: ${password.length}`)
+      console.log(`DEBUG: Hash algorithm check: ${user.password_hash?.startsWith('$2b$') ? 'bcrypt' : 'unknown'}`)
       const isValid = await verifyPassword(password, user.password_hash)
       console.log(`DEBUG: Password verification result: ${isValid}`)
       if (!isValid) {
         console.log(`DEBUG: Password verification failed for user ${user.email}`)
+        console.log(`DEBUG: This suggests either hash mismatch or RLS blocking service_role access`)
         return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

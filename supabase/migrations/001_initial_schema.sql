@@ -24,38 +24,5 @@ CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON public.jobs(user_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON public.jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON public.jobs(created_at DESC);
 
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
-
--- Service role policies for Worker API access
-CREATE POLICY "Service role full access users" ON public.users
-    FOR ALL USING (
-        current_setting('request.jwt.claims', true)::json->>'role' = 'service_role'
-        OR current_setting('request.headers', true)::json->>'authorization' LIKE 'Bearer %'
-    );
-
-CREATE POLICY "Service role full access jobs" ON public.jobs
-    FOR ALL USING (
-        current_setting('request.jwt.claims', true)::json->>'role' = 'service_role'
-        OR current_setting('request.headers', true)::json->>'authorization' LIKE 'Bearer %'
-    );
-
--- Allow public access for user creation (signup)
-CREATE POLICY "Allow user creation" ON public.users
-    FOR INSERT WITH CHECK (true);
-
--- Allow users to read their own data (for custom JWT auth)
-CREATE POLICY "Users can view own profile" ON public.users
-    FOR SELECT USING (true);
-
-CREATE POLICY "Users can update own profile" ON public.users
-    FOR UPDATE USING (true);
-
-CREATE POLICY "Users can view own jobs" ON public.jobs
-    FOR SELECT USING (true);
-
-CREATE POLICY "Users can create own jobs" ON public.jobs
-    FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "Users can update own jobs" ON public.jobs
-    FOR UPDATE USING (true);
+-- ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
