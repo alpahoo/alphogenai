@@ -48,26 +48,33 @@ jobs:
     needs: test_build
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install PostgreSQL client
+
+      - name: Install Supabase CLI
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-      
-      - name: Apply Supabase migrations
+          curl -fsSL https://cli.supabase.com/install/linux | sh
+          echo "$HOME/.supabase/bin" >> $GITHUB_PATH
+
+      - name: Apply SQL migrations via Supabase API
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          if [ -n "$SUPABASE_DB_URL" ]; then
-            echo "⚠️ Supabase migrations must be applied manually due to IPv6/IPv4 connectivity limitations"
-            echo "GitHub Actions runners use IPv4 only, but Supabase PostgreSQL uses IPv6 only"
-            echo "Please apply supabase/migrations/001_initial_schema.sql via Supabase dashboard:"
-            echo "https://app.supabase.com/project/abpbvhycqgvgpjvficff/sql/new"
-            echo "See docs/supabase-migrations.md for detailed instructions"
-            echo "Migration content preview:"
-            head -20 supabase/migrations/001_initial_schema.sql
+          if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_PROJECT_REF" ]; then
+            echo "🚀 Applying Supabase migrations via CLI API..."
+            echo "Project: $SUPABASE_PROJECT_REF"
+            echo "Migration file: supabase/migrations/001_initial_schema.sql"
+            
+            supabase db execute \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              --access-token "$SUPABASE_ACCESS_TOKEN" \
+              --file supabase/migrations/001_initial_schema.sql
+            
+            echo "✅ Migration applied successfully via Supabase API"
           else
-            echo "SUPABASE_DB_URL not configured, skipping migrations"
+            echo "⚠️ SUPABASE_ACCESS_TOKEN or SUPABASE_PROJECT_REF not configured"
+            echo "Skipping migrations - please configure these secrets:"
+            echo "- SUPABASE_ACCESS_TOKEN: Personal access token from Supabase dashboard"
+            echo "- SUPABASE_PROJECT_REF: abpbvhycqgvgpjvficff"
           fi
 
   deploy_worker:
