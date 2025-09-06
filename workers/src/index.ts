@@ -1,6 +1,9 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
+const users = new Map<string, User>()
+const jobs = new Map<string, Job>()
+
 interface Env {
   R2_BUCKET: R2Bucket
   JWT_SECRET: string
@@ -59,9 +62,6 @@ function verifyToken(token: string, secret: string): { userId: string } | null {
     return null
   }
 }
-
-const users = new Map()
-const jobs = new Map()
 
 function isSupabaseConfigured(env: Env): boolean {
   return !!(env.SUPABASE_URL && 
