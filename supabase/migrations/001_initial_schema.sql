@@ -31,13 +31,13 @@ ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Service role full access users" ON public.users
     FOR ALL USING (
         current_setting('request.jwt.claims', true)::json->>'role' = 'service_role'
-        OR current_setting('request.headers', true)::json->>'authorization' LIKE 'Bearer %'
+        OR current_setting('role', true) = 'service_role'
     );
 
 CREATE POLICY "Service role full access jobs" ON public.jobs
     FOR ALL USING (
         current_setting('request.jwt.claims', true)::json->>'role' = 'service_role'
-        OR current_setting('request.headers', true)::json->>'authorization' LIKE 'Bearer %'
+        OR current_setting('role', true) = 'service_role'
     );
 
 -- Allow public access for user creation (signup)
