@@ -226,6 +226,13 @@ async function getUserById(env: Env, id: string): Promise<User | null> {
 }
 
 async function createJob(env: Env, userId: string, prompt: string): Promise<Job> {
+  console.log(`🎬 Creating job for user ${userId} with prompt: ${prompt.substring(0, 50)}...`)
+  
+  if (!isSupabaseConfigured(env)) {
+    console.error(`❌ PRODUCTION ERROR: Supabase not configured - DB is required in production`)
+    throw new Error('Database not configured - service unavailable')
+  }
+  
   const job = {
     id: generateId(),
     user_id: userId,
@@ -238,96 +245,82 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
     updated_at: new Date().toISOString(),
   }
 
-  console.log(`DEBUG: createJob called for user ${userId}, generated job ID: ${job.id}`)
-  console.log(`DEBUG: Supabase configured: ${isSupabaseConfigured(env)}`)
-
-  if (isSupabaseConfigured(env)) {
-    try {
-      console.log(`DEBUG: Creating job in Supabase for user ${userId}, job ID: ${job.id}`)
-      console.log(`DEBUG: Job payload:`, JSON.stringify(job))
-      
-      const [created] = await supabaseRequest(env, 'POST', 'jobs', job)
-      console.log(`DEBUG: Job created successfully in Supabase: ${created.id}`)
-      console.log(`DEBUG: Created job details:`, JSON.stringify(created))
-      
-      jobs.set(created.id, created)
-      console.log(`DEBUG: Job ${created.id} also cached in memory for immediate access`)
-      
-      await triggerRunpodJob(env, created)
-      return created
-    } catch (error) {
-      console.error('Supabase createJob error:', error)
-      console.log(`DEBUG: Supabase createJob error details:`, (error as Error).message || error)
-      console.log(`DEBUG: Falling back to in-memory storage for job ${job.id}`)
-      
-      jobs.set(job.id, job)
-      console.log(`DEBUG: Job ${job.id} stored in in-memory fallback`)
-      
-      await triggerRunpodJob(env, job)
-      return job
+  console.log(`📝 Inserting job ${job.id} into Supabase for user ${userId}`)
+  console.log(`🔍 DIAGNOSTIC POST: About to insert job with user_id=${userId}, job_id=${job.id}`)
+  
+  try {
+    const [created] = await supabaseRequest(env, 'POST', 'jobs', job)
+    console.log(`✅ Job ${job.id} created successfully in Supabase`)
+    console.log(`🔍 DIAGNOSTIC POST: inserted_user_id=${userId}, job_id=${job.id}`)
+    
+    console.log(`🔍 Verifying job exists immediately after creation...`)
+    const verifyResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${job.id}`)
+    console.log(`🔍 DIAGNOSTIC VERIFY: job_id=${job.id}, rows_found=${verifyResult.length}, exists=${verifyResult.length > 0}`)
+    
+    if (verifyResult.length > 0) {
+      console.log(`✅ Job ${job.id} confirmed to exist in database`)
+    } else {
+      console.error(`❌ Job ${job.id} NOT found in database immediately after creation!`)
     }
-  } else {
-    console.log(`DEBUG: Supabase not configured, storing job ${job.id} in-memory`)
-    jobs.set(job.id, job)
-    await triggerRunpodJob(env, job)
-    return job
+    
+    jobs.set(created.id, created)
+    await triggerRunpodJob(env, created)
+    return created
+  } catch (error) {
+    console.error(`❌ Error creating job in Supabase:`, error)
+    throw error
+  }
+}
+
+async function getJobForUser(env: Env, jobId: string, userId: string): Promise<Job | null> {
+  console.log(`🔍 Getting job ${jobId} for user ${userId}`)
+  
+  if (!isSupabaseConfigured(env)) {
+    console.error(`❌ PRODUCTION ERROR: Supabase not configured - DB is required in production`)
+    throw new Error('Database not configured - service unavailable')
+  }
+  
+  console.log(`📖 Querying Supabase for job ${jobId}`)
+  console.log(`🔍 DIAGNOSTIC GET: job_id=${jobId}, jwt_sub=${userId}, query_user_id_used=${userId}`)
+  
+  try {
+    const jobsResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${jobId}&user_id=eq.${userId}`)
+    console.log(`🔍 DIAGNOSTIC GET: rows_found=${jobsResult.length}`)
+    console.log(`📊 Supabase returned ${jobsResult.length} jobs for query`)
+    
+    if (jobsResult.length > 0) {
+      console.log(`✅ Job ${jobId} found in Supabase`)
+      return jobsResult[0]
+    }
+    
+    console.log(`🔍 Testing unfiltered query to check if job exists at all...`)
+    const unfilteredResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${jobId}`)
+    console.log(`🔍 DIAGNOSTIC UNFILTERED: job exists=${unfilteredResult.length > 0}, owner_user_id=${unfilteredResult.length > 0 ? unfilteredResult[0].user_id : 'N/A'}`)
+    
+    if (unfilteredResult.length > 0 && unfilteredResult[0].user_id !== userId) {
+      console.log(`❌ OWNERSHIP MISMATCH: job.user_id=${unfilteredResult[0].user_id} !== jwt.sub=${userId}`)
+      return null
+    }
+    
+    console.log(`❌ Job ${jobId} not found in database`)
+    return null
+  } catch (error) {
+    console.error(`❌ Error querying Supabase for job:`, error)
+    throw error
   }
 }
 
 async function getJob(env: Env, id: string): Promise<Job | null> {
-  console.log(`DEBUG: getJob called for ID: ${id}`)
-  console.log(`DEBUG: In-memory jobs count: ${jobs.size}`)
-  console.log(`DEBUG: Supabase configured: ${isSupabaseConfigured(env)}`)
-  console.log(`DEBUG: SUPABASE_URL: ${env.SUPABASE_URL?.substring(0, 50)}...`)
-  console.log(`DEBUG: SUPABASE_SERVICE_ROLE: ${env.SUPABASE_SERVICE_ROLE?.substring(0, 20)}...`)
-  
   if (isSupabaseConfigured(env)) {
     try {
-      console.log(`DEBUG: Getting job from Supabase by ID: ${id} with service_role auth`)
-      console.log(`DEBUG: Query URL: ${env.SUPABASE_URL}/rest/v1/jobs?id=eq.${id}`)
-      
       const jobsResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${id}`)
-      console.log(`DEBUG: Supabase query returned ${jobsResult?.length || 0} jobs for ID ${id}`)
-      console.log(`DEBUG: Raw Supabase response:`, JSON.stringify(jobsResult))
-      
-      if (jobsResult && jobsResult.length > 0) {
-        const job = jobsResult[0]
-        console.log(`DEBUG: Found job in Supabase: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
-        
-        jobs.set(job.id, job)
-        console.log(`DEBUG: Job cached in memory for future lookups`)
-        
-        return job
-      } else {
-        console.log(`DEBUG: No job found in Supabase with ID ${id}`)
-        console.log(`DEBUG: Checking if job exists in in-memory storage...`)
-        const job = jobs.get(id) || null
-        console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage`)
-        if (job) {
-          console.log(`DEBUG: In-memory job details: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
-        }
-        return job
-      }
+      return jobsResult.length > 0 ? jobsResult[0] : null
     } catch (error) {
       console.error('Supabase getJob error:', error)
-      console.log(`DEBUG: Supabase error details:`, (error as Error).message || error)
-      console.log(`DEBUG: Falling back to in-memory storage for job ${id}`)
-      
-      const job = jobs.get(id) || null
-      console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage after Supabase error`)
-      if (job) {
-        console.log(`DEBUG: In-memory job details: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
-      }
-      return job
+      return jobs.get(id) || null
     }
   } else {
-    console.log(`DEBUG: Supabase not configured, checking in-memory storage for job ${id}`)
-    const job = jobs.get(id) || null
-    console.log(`DEBUG: ${job ? 'Found' : 'Not found'} job in in-memory storage`)
-    if (job) {
-      console.log(`DEBUG: In-memory job details: ${job.id}, user_id: ${job.user_id}, status: ${job.status}`)
-    }
-    return job
+    return jobs.get(id) || null
   }
 }
 
@@ -530,147 +523,150 @@ async function authenticateRequest(request: Request, env: Env): Promise<string |
 }
 
 async function handleJobs(request: Request, env: Env): Promise<Response> {
-  const userId = await authenticateRequest(request, env)
-  if (!userId) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
   const url = new URL(request.url)
   const path = url.pathname
+  const method = request.method
 
-  if (request.method === 'POST' && path === '/api/jobs') {
+  if (path === '/api/jobs' && method === 'POST') {
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log(`❌ POST /api/jobs: Missing or invalid Authorization header`)
+      return new Response(JSON.stringify({ error: 'Authorization required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const token = authHeader.substring(7)
+    const decoded = verifyToken(token, env.JWT_SECRET)
+    if (!decoded) {
+      console.log(`❌ POST /api/jobs: Invalid JWT token`)
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const { prompt } = await request.json() as { prompt: string }
 
     if (!prompt) {
+      console.log(`❌ POST /api/jobs: Missing prompt`)
       return new Response(JSON.stringify({ error: 'Prompt required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
+    console.log(`🎬 POST /api/jobs: Creating job for user ${decoded.userId}`)
+
     try {
-      const job = await createJob(env, userId, prompt)
-      
-      console.log(`DIAGNOSTIC POST /api/jobs: Created job ${job.id} for user ${userId}`)
-      console.log(`DIAGNOSTIC POST /api/jobs: Attempting immediate verification...`)
-      
-      if (isSupabaseConfigured(env)) {
-        try {
-          const verifyResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${job.id}`)
-          console.log(`DIAGNOSTIC POST /api/jobs: Verification query returned ${verifyResult?.length || 0} rows`)
-          if (verifyResult && verifyResult.length > 0) {
-            const verifiedJob = verifyResult[0]
-            console.log(`DIAGNOSTIC POST /api/jobs: Verified job exists - id: ${verifiedJob.id}, user_id: ${verifiedJob.user_id}`)
-          } else {
-            console.log(`DIAGNOSTIC POST /api/jobs: WARNING - Job ${job.id} not found in immediate verification!`)
-          }
-        } catch (verifyError) {
-          console.log(`DIAGNOSTIC POST /api/jobs: Verification query failed:`, verifyError)
-        }
-      }
+      const job = await createJob(env, decoded.userId, prompt)
+      console.log(`✅ POST /api/jobs: Job ${job.id} created successfully`)
       
       return new Response(JSON.stringify({ job }), {
+        status: 201,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      console.error('Job creation error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      return new Response(JSON.stringify({ 
-        error: 'Failed to create job', 
-        details: errorMessage 
-      }), {
+      console.error(`❌ POST /api/jobs: Job creation failed:`, error)
+      return new Response(JSON.stringify({ error: 'Failed to create job' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
   }
 
-  if (request.method === 'GET' && path === '/api/jobs') {
-    try {
-      const jobs = await getUserJobs(env, userId)
-      return new Response(JSON.stringify({ jobs }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    } catch (error) {
-      return new Response(JSON.stringify({ error: 'Failed to fetch jobs' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-  }
-
-  if (request.method === 'GET' && path.startsWith('/api/jobs/')) {
+  if (path.startsWith('/api/jobs/') && method === 'GET') {
     const jobId = path.split('/')[3]
-    
+    if (!jobId) {
+      console.log(`❌ GET /api/jobs: Missing job ID`)
+      return new Response(JSON.stringify({ error: 'Job ID required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const authHeader = request.headers.get('Authorization')
-    console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: job_id=${jobId}, jwt_sub=${userId}, auth_header_present=${!!authHeader}`)
-    console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: query_user_id_used=${userId}`)
+    console.log(`🔍 DIAGNOSTIC GET: auth_header_present=${!!authHeader}, job_id=${jobId}`)
     
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log(`❌ GET /api/jobs/${jobId}: Missing or invalid Authorization header`)
+      return new Response(JSON.stringify({ error: 'Authorization required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const token = authHeader.substring(7)
+    const decoded = verifyToken(token, env.JWT_SECRET)
+    if (!decoded) {
+      console.log(`❌ GET /api/jobs/${jobId}: Invalid JWT token`)
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    console.log(`🔍 DIAGNOSTIC GET: jwt_sub=${decoded.userId}, job_id=${jobId}`)
+
     try {
-      const job = await getJob(env, jobId)
-      console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: rows_found=${job ? 1 : 0}`)
-      
-      if (job) {
-        console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Found job - user_id=${job.user_id}, status=${job.status}, created_at=${job.created_at}`)
-        console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Ownership check - job.user_id=${job.user_id} === jwt_sub=${userId} ? ${job.user_id === userId}`)
-      }
-      
+      const job = await getJobForUser(env, jobId, decoded.userId)
       if (!job) {
-        console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Job not found - checking if it exists without user filter...`)
-        
-        if (isSupabaseConfigured(env)) {
-          try {
-            const allJobsResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${jobId}`)
-            console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Unfiltered query returned ${allJobsResult?.length || 0} rows`)
-            if (allJobsResult && allJobsResult.length > 0) {
-              const foundJob = allJobsResult[0]
-              console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Job EXISTS but filtered out - actual_user_id=${foundJob.user_id}, requesting_user_id=${userId}`)
-              console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: This indicates a user_id mismatch issue`)
-            } else {
-              console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Job does NOT exist in database at all`)
-            }
-          } catch (diagError) {
-            console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Diagnostic query failed:`, diagError)
-          }
-        }
-        
-        return new Response(JSON.stringify({ 
-          error: 'Job not found',
-          debug: `Job ${jobId} not found in database or memory storage`
-        }), {
+        console.log(`❌ GET /api/jobs/${jobId}: Job not found for user ${decoded.userId}`)
+        return new Response(JSON.stringify({ error: 'Job not found' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      if (job.user_id !== userId) {
-        console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Ownership mismatch - job.user_id=${job.user_id}, jwt_sub=${userId}`)
-        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      if (job.user_id !== decoded.userId) {
+        console.log(`❌ GET /api/jobs/${jobId}: Access denied - ownership mismatch`)
+        return new Response(JSON.stringify({ error: 'Access denied' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      console.log(`DIAGNOSTIC GET /api/jobs/${jobId}: Returning job successfully`)
+      console.log(`✅ GET /api/jobs/${jobId}: Job found and returned successfully`)
       return new Response(JSON.stringify({ job }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
-      console.error(`DEBUG: Error in GET /api/jobs/${jobId}:`, error)
-      return new Response(JSON.stringify({ 
-        error: 'Failed to fetch job',
-        debug: error instanceof Error ? error.message : 'Unknown error'
-      }), {
+      console.error(`❌ GET /api/jobs/${jobId}: Database error:`, error)
+      return new Response(JSON.stringify({ error: 'Internal server error' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
   }
 
-  return new Response('Not found', { status: 404, headers: corsHeaders })
+  if (path === '/api/jobs' && method === 'GET') {
+    const userId = await authenticateRequest(request, env)
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    try {
+      const userJobs = await getUserJobs(env, userId)
+      return new Response(JSON.stringify({ jobs: userJobs }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    } catch (error) {
+      console.error('Failed to get jobs:', error)
+      return new Response(JSON.stringify({ error: 'Failed to get jobs' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+  }
+
+  return new Response(JSON.stringify({ error: 'Not found' }), {
+    status: 404,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
 }
 
 async function handleAssets(request: Request, env: Env): Promise<Response> {

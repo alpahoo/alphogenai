@@ -1,0 +1,121 @@
+name: E2E Create-Then-Read Test
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main, 'devin/**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  create_then_read_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for deployment to be ready
+        run: |
+          echo "⏳ Waiting 30 seconds for deployment to stabilize..."
+          sleep 30
+
+      - name: Test Create-Then-Read Flow
+        run: |
+          echo "🔍 Testing critical create-then-read flow..."
+          
+          # Generate unique test email
+          TEST_EMAIL="create-read-test-$(date +%s)@example.com"
+          TEST_PASSWORD="testpass123"
+          
+          echo "📝 Step 1: Signup with email: $TEST_EMAIL"
+          SIGNUP_RESPONSE=$(curl -s -X POST https://api.alphogen.com/api/auth/signup \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}" \
+            -w "\nHTTP_STATUS:%{http_code}")
+          
+          echo "$SIGNUP_RESPONSE"
+          
+          if ! echo "$SIGNUP_RESPONSE" | grep -q "HTTP_STATUS:200"; then
+            echo "❌ Signup failed"
+            exit 1
+          fi
+          
+          echo "🔐 Step 2: Login to get token"
+          LOGIN_RESPONSE=$(curl -s -X POST https://api.alphogen.com/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}" \
+            -w "\nHTTP_STATUS:%{http_code}")
+          
+          echo "$LOGIN_RESPONSE"
+          
+          if ! echo "$LOGIN_RESPONSE" | grep -q "HTTP_STATUS:200"; then
+            echo "❌ Login failed"
+            exit 1
+          fi
+          
+          TOKEN=$(echo "$LOGIN_RESPONSE" | grep -v "HTTP_STATUS" | jq -r '.token')
+          echo "✅ Token obtained: ${TOKEN:0:20}..."
+          
+          echo "🎬 Step 3: Create job"
+          JOB_RESPONSE=$(curl -s -X POST https://api.alphogen.com/api/jobs \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"prompt":"Create-then-read test job - must be retrievable immediately"}' \
+            -w "\nHTTP_STATUS:%{http_code}")
+          
+          echo "$JOB_RESPONSE"
+          
+          if ! echo "$JOB_RESPONSE" | grep -q "HTTP_STATUS:20[01]"; then
+            echo "❌ Job creation failed"
+            exit 1
+          fi
+          
+          JOB_ID=$(echo "$JOB_RESPONSE" | grep -v "HTTP_STATUS" | jq -r '.job.id')
+          echo "✅ Job created with ID: $JOB_ID"
+          
+          echo "🔍 Step 4: IMMEDIATE job retrieval (critical test)"
+          JOB_GET_RESPONSE=$(curl -s https://api.alphogen.com/api/jobs/$JOB_ID \
+            -H "Authorization: Bearer $TOKEN" \
+            -w "\nHTTP_STATUS:%{http_code}")
+          
+          echo "$JOB_GET_RESPONSE"
+          
+          if echo "$JOB_GET_RESPONSE" | grep -q "HTTP_STATUS:404"; then
+            echo "❌ CRITICAL FAILURE: Job returns 404 immediately after creation!"
+            echo "❌ This indicates the job persistence bug is NOT fixed"
+            exit 1
+          elif echo "$JOB_GET_RESPONSE" | grep -q "HTTP_STATUS:200"; then
+            echo "✅ SUCCESS: Job retrieved immediately after creation (200)"
+            
+            # Verify job data
+            RETRIEVED_JOB_ID=$(echo "$JOB_GET_RESPONSE" | grep -v "HTTP_STATUS" | jq -r '.job.id')
+            if [ "$RETRIEVED_JOB_ID" = "$JOB_ID" ]; then
+              echo "✅ Job ID matches: $RETRIEVED_JOB_ID"
+            else
+              echo "⚠️ Job ID mismatch: expected $JOB_ID, got $RETRIEVED_JOB_ID"
+            fi
+            
+            JOB_STATUS=$(echo "$JOB_GET_RESPONSE" | grep -v "HTTP_STATUS" | jq -r '.job.status')
+            echo "📊 Job status: $JOB_STATUS"
+            
+          else
+            echo "❌ Unexpected response status for job retrieval"
+            exit 1
+          fi
+          
+          echo ""
+          echo "🎉 CREATE-THEN-READ TEST PASSED!"
+          echo "✅ The critical 404 job persistence bug has been FIXED"
+          echo "✅ Jobs can be retrieved immediately after creation"
+
+      - name: Test Results Summary
+        run: |
+          echo "🎯 Create-Then-Read Test Results:"
+          echo "✅ User signup: Working"
+          echo "✅ User login: Working"  
+          echo "✅ Job creation: Working"
+          echo "✅ IMMEDIATE job retrieval: Working (NO 404!)"
+          echo ""
+          echo "🚀 The job persistence issue has been resolved!"
