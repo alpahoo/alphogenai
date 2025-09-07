@@ -52,13 +52,16 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 }
 
 function generateToken(userId: string, secret: string): string {
-  return jwt.sign({ userId }, secret, { expiresIn: '7d' })
+  return jwt.sign({ sub: userId }, secret, { expiresIn: '7d' })
 }
 
-function verifyToken(token: string, secret: string): { userId: string } | null {
+function verifyToken(token: string, secret: string): { sub: string } | null {
   try {
-    return jwt.verify(token, secret) as { userId: string }
-  } catch {
+    const decoded = jwt.verify(token, secret) as { sub: string }
+    console.log(`🔐 JWT verified - sub: ${decoded.sub}`)
+    return decoded
+  } catch (error) {
+    console.error('JWT verification failed:', error)
     return null
   }
 }
@@ -131,6 +134,7 @@ async function supabaseRequest(env: Env, method: string, table: string, data?: a
 
 async function createUser(env: Env, email: string, passwordHash: string): Promise<User> {
   if (!isSupabaseConfigured(env)) {
+    console.error(`❌ PRODUCTION ERROR: Supabase not configured - DB is required in production`)
     throw new Error('Database not configured - service unavailable')
   }
 
@@ -151,84 +155,51 @@ async function createUser(env: Env, email: string, passwordHash: string): Promis
     users.set(created.id, created)
     return created
   } catch (error) {
-    console.error('Failed to create user in custom users table:', error)
-    throw error
+    console.error('❌ CRITICAL: User creation failed in createUser function')
+    console.error('❌ Error:', error)
+    throw new Error(`User creation failed: ${(error as any)?.message || 'Unknown error'}`)
   }
 }
 
 async function getUserByEmail(env: Env, email: string): Promise<User | null> {
-  console.log(`DEBUG: getUserByEmail called for: ${email}`)
-  console.log(`DEBUG: In-memory users count: ${users.size}`)
-  console.log(`DEBUG: Supabase configured: ${isSupabaseConfigured(env)}`)
-  console.log(`DEBUG: SUPABASE_URL: ${env.SUPABASE_URL?.substring(0, 50)}...`)
-  console.log(`DEBUG: SUPABASE_SERVICE_ROLE: ${env.SUPABASE_SERVICE_ROLE?.substring(0, 20)}...`)
-  
-  if (isSupabaseConfigured(env)) {
-    try {
-      console.log(`DEBUG: Getting user by email from Supabase: ${email}`)
-      console.log(`DEBUG: Query URL: ${env.SUPABASE_URL}/rest/v1/users?email=eq.${email}`)
-      
-      const usersResult = await supabaseRequest(env, 'GET', 'users', null, `email=eq.${email}`)
-      console.log(`DEBUG: Supabase query returned ${usersResult?.length || 0} users for email ${email}`)
-      console.log(`DEBUG: Raw Supabase response:`, JSON.stringify(usersResult))
-      
-      if (usersResult && usersResult.length > 0) {
-        const user = usersResult[0]
-        console.log(`DEBUG: Found user in Supabase: ${user.id}, email: ${user.email}`)
-        console.log(`DEBUG: Supabase user password_hash length: ${user.password_hash?.length}`)
-        console.log(`DEBUG: Supabase user password_hash starts with: ${user.password_hash?.substring(0, 10)}...`)
-        
-        users.set(user.id, user)
-        console.log(`DEBUG: User cached in memory for future lookups`)
-        
-        return user
-      } else {
-        console.log(`DEBUG: No user found in Supabase with email ${email}`)
-        console.log(`DEBUG: Checking if user exists in in-memory storage...`)
-        for (const user of users.values()) {
-          if (user.email === email) {
-            console.log(`DEBUG: Found user in in-memory storage: ${user.id}`)
-            console.log(`DEBUG: In-memory user password_hash length: ${user.password_hash?.length}`)
-            return user
-          }
-        }
-        console.log(`DEBUG: User not found in either Supabase or in-memory storage`)
-        return null
-      }
-    } catch (error) {
-      console.error('Supabase getUserByEmail error:', error)
-      console.log(`DEBUG: Supabase error details:`, (error as Error).message || error)
-      console.log(`DEBUG: Falling back to in-memory storage for email ${email}`)
-      
-      for (const user of users.values()) {
-        if (user.email === email) {
-          console.log(`DEBUG: Found user in in-memory storage after Supabase error: ${user.id}`)
-          console.log(`DEBUG: In-memory user password_hash length: ${user.password_hash?.length}`)
-          return user
-        }
-      }
-      console.log(`DEBUG: User not found in in-memory storage either`)
+  if (!isSupabaseConfigured(env)) {
+    console.error(`❌ PRODUCTION ERROR: Supabase not configured - DB is required in production`)
+    throw new Error('Database not configured - service unavailable')
+  }
+
+  try {
+    console.log(`🔍 Getting user by email from Supabase: ${email}`)
+    const usersResult = await supabaseRequest(env, 'GET', 'users', null, `email=eq.${email}`)
+    
+    if (usersResult && usersResult.length > 0) {
+      const user = usersResult[0]
+      console.log(`✅ Found user in Supabase: ${user.id}, email: ${user.email}`)
+      users.set(user.id, user)
+      return user
+    } else {
+      console.log(`❌ No user found in Supabase with email ${email}`)
       return null
     }
-  } else {
-    console.log(`DEBUG: Supabase not configured, checking in-memory storage for email ${email}`)
-    for (const user of users.values()) {
-      if (user.email === email) {
-        console.log(`DEBUG: Found user in in-memory storage: ${user.id}`)
-        return user
-      }
-    }
-    console.log(`DEBUG: User not found in in-memory storage`)
-    return null
+  } catch (error) {
+    console.error('❌ CRITICAL: getUserByEmail failed')
+    console.error('❌ Error:', error)
+    throw new Error(`User lookup failed: ${(error as any)?.message || 'Unknown error'}`)
   }
 }
 
 async function getUserById(env: Env, id: string): Promise<User | null> {
-  if (isSupabaseConfigured(env)) {
+  if (!isSupabaseConfigured(env)) {
+    console.error(`❌ PRODUCTION ERROR: Supabase not configured - DB is required in production`)
+    throw new Error('Database not configured - service unavailable')
+  }
+
+  try {
     const usersResult = await supabaseRequest(env, 'GET', 'users', null, `id=eq.${id}`)
     return usersResult[0] || null
-  } else {
-    return users.get(id) || null
+  } catch (error) {
+    console.error('❌ CRITICAL: getUserById failed')
+    console.error('❌ Error:', error)
+    throw new Error(`User lookup failed: ${(error as any)?.message || 'Unknown error'}`)
   }
 }
 
@@ -291,32 +262,30 @@ async function getJobForUser(env: Env, jobId: string, userId: string): Promise<J
     console.error(`❌ PRODUCTION ERROR: Supabase not configured - DB is required in production`)
     throw new Error('Database not configured - service unavailable')
   }
-  
-  console.log(`🔍 DIAGNOSTIC GET: job_id=${jobId}, jwt_sub=${userId}, query_user_id_used=${userId}`)
-  
+
   try {
     const result = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${jobId}`)
-    console.log(`🔍 DIAGNOSTIC GET: rows_found=${result.length}`)
+    console.log(`🔍 Found ${result.length} jobs with id ${jobId}`)
     
     if (result.length > 0) {
       const job = result[0]
-      console.log(`🔍 Found job - job.user_id=${job.user_id}, jwt.userId=${userId}`)
+      console.log(`🔍 Job found - job.user_id=${job.user_id}, jwt.sub=${userId}`)
       
       if (job.user_id !== userId) {
-        console.log(`❌ Job ${jobId} ownership check failed - job.user_id=${job.user_id} !== jwt.userId=${userId}`)
+        console.log(`❌ Ownership check failed - job.user_id=${job.user_id} !== jwt.sub=${userId}`)
         return null
       }
       
-      console.log(`✅ Job ${jobId} found and ownership verified for user ${userId}`)
-      console.log(`🔍 Job data:`, JSON.stringify(job, null, 2))
+      console.log(`✅ Job ${jobId} ownership verified for user ${userId}`)
       return job
     } else {
-      console.log(`❌ Job ${jobId} not found in database at all`)
+      console.log(`❌ Job ${jobId} not found in database`)
       return null
     }
   } catch (error) {
-    console.error('Failed to get job from Supabase:', error)
-    throw error
+    console.error(`❌ CRITICAL: getJobForUser failed for job ${jobId}, user ${userId}`)
+    console.error('❌ Error:', error)
+    throw new Error(`Job lookup failed: ${(error as any)?.message || 'Unknown error'}`)
   }
 }
 
@@ -443,10 +412,13 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
       const user = await createUser(env, email, passwordHash)
       const token = generateToken(user.id, env.JWT_SECRET)
 
+      console.log(`✅ Signup successful - user.id: ${user.id}, JWT.sub: ${user.id}`)
+
       return new Response(JSON.stringify({
         user: { id: user.id, email: user.email },
         token,
       }), {
+        status: 201,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
@@ -502,10 +474,13 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
 
       const token = generateToken(user.id, env.JWT_SECRET)
 
+      console.log(`✅ Login successful - user.id: ${user.id}, JWT.sub: ${user.id}`)
+
       return new Response(JSON.stringify({
         user: { id: user.id, email: user.email },
         token,
       }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } catch (error) {
@@ -529,7 +504,7 @@ async function authenticateRequest(request: Request, env: Env): Promise<string |
 
   const token = authHeader.substring(7)
   const payload = verifyToken(token, env.JWT_SECRET)
-  return payload?.userId || null
+  return payload?.sub || null
 }
 
 async function handleJobs(request: Request, env: Env): Promise<Response> {
@@ -567,10 +542,10 @@ async function handleJobs(request: Request, env: Env): Promise<Response> {
       })
     }
 
-    console.log(`🎬 POST /api/jobs: Creating job for user ${decoded.userId}`)
+    console.log(`🎬 POST /api/jobs: Creating job for user ${decoded.sub}`)
 
     try {
-      const job = await createJob(env, decoded.userId, prompt)
+      const job = await createJob(env, decoded.sub, prompt)
       console.log(`✅ POST /api/jobs: Job ${job.id} created successfully`)
       
       return new Response(JSON.stringify({ job }), {
@@ -617,19 +592,19 @@ async function handleJobs(request: Request, env: Env): Promise<Response> {
       })
     }
 
-    console.log(`🔍 DIAGNOSTIC GET: jwt_sub=${decoded.userId}, job_id=${jobId}`)
+    console.log(`🔍 DIAGNOSTIC GET: jwt_sub=${decoded.sub}, job_id=${jobId}`)
 
     try {
-      const job = await getJobForUser(env, jobId, decoded.userId)
+      const job = await getJobForUser(env, jobId, decoded.sub)
       if (!job) {
-        console.log(`❌ GET /api/jobs/${jobId}: Job not found for user ${decoded.userId}`)
+        console.log(`❌ GET /api/jobs/${jobId}: Job not found for user ${decoded.sub}`)
         return new Response(JSON.stringify({ error: 'Job not found' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      if (job.user_id !== decoded.userId) {
+      if (job.user_id !== decoded.sub) {
         console.log(`❌ GET /api/jobs/${jobId}: Access denied - ownership mismatch`)
         return new Response(JSON.stringify({ error: 'Access denied' }), {
           status: 403,

@@ -1,19 +1,20 @@
 let authToken: string | null = null
 
-export function setAuthToken(token: string) {
+export function setAuthToken(token: string | null) {
   authToken = token
   if (typeof window !== 'undefined') {
-    localStorage.setItem('auth_token', token)
+    if (token) {
+      localStorage.setItem('auth_token', token)
+    } else {
+      localStorage.removeItem('auth_token')
+    }
   }
 }
 
 export function getAuthToken(): string | null {
-  if (authToken) return authToken
-  
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && !authToken) {
     authToken = localStorage.getItem('auth_token')
   }
-  
   return authToken
 }
 
@@ -24,24 +25,31 @@ export function clearAuthToken() {
   }
 }
 
-const originalFetch = fetch
-
-window.fetch = function(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+if (typeof window !== 'undefined') {
+  const originalFetch = window.fetch
   
-  if (url.includes('/api/jobs')) {
-    const token = getAuthToken()
-    if (token) {
-      init = init || {}
-      init.headers = {
-        ...init.headers,
-        'Authorization': `Bearer ${token}`
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+    
+    if (url.includes('/api/jobs') || (url.includes('/api/') && !url.includes('/api/auth/'))) {
+      const token = getAuthToken()
+      if (token) {
+        init = init || {}
+        init.headers = {
+          ...init.headers,
+          'Authorization': `Bearer ${token}`
+        }
+        console.log(`🔐 Adding Authorization header to ${url}`)
+      } else {
+        console.warn(`⚠️ No auth token available for ${url}`)
       }
-      console.log(`🔐 Added Authorization header to ${url}`)
-    } else {
-      console.warn(`⚠️ No auth token available for ${url}`)
     }
+    
+    return originalFetch(input, init)
   }
   
-  return originalFetch(input, init)
+  authToken = localStorage.getItem('auth_token')
+  if (authToken) {
+    console.log('🔐 Auth token loaded from localStorage on page load')
+  }
 }
