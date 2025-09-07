@@ -1,3 +1,9 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+NOTIFY pgrst, 'reload schema';
+ALTER TABLE IF EXISTS public.jobs ADD COLUMN IF NOT EXISTS _touch int;
+ALTER TABLE IF EXISTS public.jobs DROP COLUMN IF EXISTS _touch;
+
 create table if not exists public.jobs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -18,6 +24,11 @@ using (auth.uid() = user_id);
 create policy "Users can insert their own jobs"
 on public.jobs for insert
 with check (auth.uid() = user_id);
+
+-- Service role policies for Worker operations
+create policy "Service role full access"
+on public.jobs for all
+using (auth.role() = 'service_role');
 
 create index if not exists idx_jobs_user_id on public.jobs(user_id);
 create index if not exists idx_jobs_status on public.jobs(status);
