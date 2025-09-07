@@ -1,0 +1,110 @@
+name: E2E Production Tests
+
+on:
+  workflow_run:
+    workflows: [CI/CD Pipeline]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      production_url:
+        description: Production URL to test
+        required: true
+        default: 'https://alphogenai.vercel.app'
+
+jobs:
+  e2e_production_test:
+    name: E2E Production Flow Test
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test Complete Production Flow
+        run: |
+          echo "Testing complete production user flow..."
+
+          PRODUCTION_URL="${{ github.event.inputs.production_url || 'https://alphogenai.vercel.app' }}"
+          echo "Testing against: $PRODUCTION_URL"
+
+          # Test stable user signup/login
+          TEST_EMAIL="qa-user@mailinator.com"
+          TEST_PASSWORD="Test1234!"
+
+          echo "Testing signup with stable test user..."
+          SIGNUP_RESPONSE=$(curl -s -X POST "${{ secrets.SUPABASE_URL }}/auth/v1/signup" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}")
+
+          echo "Signup response: $SIGNUP_RESPONSE"
+
+          # Test login and get token
+          echo "Testing login..."
+          LOGIN_RESPONSE=$(curl -s -X POST "${{ secrets.SUPABASE_URL }}/auth/v1/token?grant_type=password" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}")
+
+          ACCESS_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.access_token // empty')
+
+          if [ -n "$ACCESS_TOKEN" ] && [ "$ACCESS_TOKEN" != "null" ]; then
+            echo "✅ Authentication successful"
+
+            # Test job creation
+            echo "Testing job creation..."
+            JOB_RESPONSE=$(curl -s -X POST "${PRODUCTION_URL}/api/jobs" \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"prompt":"E2E test video generation"}')
+
+            echo "Job creation response: $JOB_RESPONSE"
+
+            JOB_ID=$(echo "$JOB_RESPONSE" | jq -r '.job.id // empty')
+
+            if [ -n "$JOB_ID" ] && [ "$JOB_ID" != "null" ]; then
+              echo "✅ Job creation successful: $JOB_ID"
+
+              # Test job retrieval immediately
+              echo "Testing job retrieval..."
+              GET_JOB_RESPONSE=$(curl -s -X GET "${PRODUCTION_URL}/api/jobs/$JOB_ID" \
+                -H "Authorization: Bearer $ACCESS_TOKEN")
+
+              echo "Job details: $GET_JOB_RESPONSE"
+
+              # Verify job exists and has correct structure
+              JOB_STATUS=$(echo "$GET_JOB_RESPONSE" | jq -r '.job.status // empty')
+
+              if [ -n "$JOB_STATUS" ]; then
+                echo "✅ Job retrieval successful - Status: $JOB_STATUS"
+
+                # Test webhook endpoint
+                echo "Testing webhook endpoint..."
+                WEBHOOK_RESPONSE=$(curl -s -X POST "${PRODUCTION_URL}/api/webhooks/runpod" \
+                  -H "Content-Type: application/json" \
+                  -H "x-webhook-secret: ${{ secrets.WEBHOOK_SECRET || 'test-secret' }}" \
+                  -d "{\"id\":\"$JOB_ID\",\"status\":\"COMPLETED\",\"output\":{\"result_url\":\"https://example.com/result.mp4\"}}")
+
+                echo "Webhook response: $WEBHOOK_RESPONSE"
+
+                if echo "$WEBHOOK_RESPONSE" | jq -e '.success' > /dev/null 2>&1; then
+                  echo "✅ Webhook endpoint working"
+                  echo "✅ Complete E2E production flow successful"
+                else
+                  echo "❌ Webhook endpoint failed"
+                  exit 1
+                fi
+              else
+                echo "❌ Job retrieval failed"
+                exit 1
+              fi
+            else
+              echo "❌ Job creation failed"
+              exit 1
+            fi
+          else
+            echo "❌ Authentication failed"
+            exit 1
+          fi
