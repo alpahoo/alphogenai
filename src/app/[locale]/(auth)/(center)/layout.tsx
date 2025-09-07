@@ -23,7 +23,7 @@ export default function CenteredLayout(props: { children: React.ReactNode }) {
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_, session) => {
         if (session?.user) {
           router.push('/dashboard');
         } else {
