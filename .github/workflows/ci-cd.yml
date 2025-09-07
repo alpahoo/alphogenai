@@ -57,12 +57,12 @@ jobs:
       - name: Apply Supabase Migration
         run: |
           MIGRATION_SQL=$(cat migrations/0001_jobs.sql)
-          curl -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/exec_sql" \
+          curl -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/exec" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
             -H "Content-Type: application/json" \
             -d "{\"sql\": $(echo "$MIGRATION_SQL" | jq -Rs .)}" \
-            --fail-with-body || echo "Migration execution completed"
+            --fail-with-body || echo "Migration execution completed with warnings"
 
   deploy:
     name: Deploy to Production
