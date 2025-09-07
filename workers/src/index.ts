@@ -210,18 +210,12 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
   }
   
   const job = {
-    id: generateId(),
     user_id: userId,
     prompt,
-    status: 'queued' as const,
-    progress: 0,
-    result_r2_key: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
   }
 
   console.log(`🎬 Creating job for user ${userId}`)
-  console.log(`🔍 DIAGNOSTIC CREATE: user_id=${userId}, job_id=${job.id}`)
+  console.log(`🔍 DIAGNOSTIC CREATE: user_id=${userId}, prompt="${prompt}"`)
   console.log(`📝 Inserting job into Supabase with service_role`)
   
   try {
