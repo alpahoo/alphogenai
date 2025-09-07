@@ -24,7 +24,7 @@ if (process.env.NEXT_PHASE !== PHASE_PRODUCTION_BUILD && Env.DATABASE_URL) {
   });
 } else {
   console.warn('No DATABASE_URL provided - using minimal fallback for development');
-  
+
   drizzle = drizzlePg(new Client({ connectionString: 'postgresql://localhost:5432/fallback' }), { schema });
 }
 
