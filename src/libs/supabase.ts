@@ -31,7 +31,9 @@ export const createServerSupabaseClient = () => {
   );
 };
 
-export const supabaseAdmin = createClient(
-  Env.NEXT_PUBLIC_SUPABASE_URL || '',
-  Env.SUPABASE_SERVICE_ROLE || '',
-);
+export const createSupabaseAdmin = () => {
+  return createClient(
+    Env.NEXT_PUBLIC_SUPABASE_URL || '',
+    Env.SUPABASE_SERVICE_ROLE || '',
+  );
+};

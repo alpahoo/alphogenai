@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { createServerSupabaseClient, supabaseAdmin } from '@/libs/supabase';
+import { createServerSupabaseClient, createSupabaseAdmin } from '@/libs/supabase';
 
 export async function GET() {
   try {
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
-    const { data: job, error } = await supabaseAdmin
+    const { data: job, error } = await createSupabaseAdmin()
       .from('jobs')
       .insert({
         user_id: user.id,
