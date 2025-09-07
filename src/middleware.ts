@@ -22,7 +22,7 @@ const isProtectedRoute = (pathname: string) => {
 
 export default async function middleware(
   request: NextRequest,
-  event: NextFetchEvent,
+  _: NextFetchEvent,
 ) {
   if (
     request.nextUrl.pathname.includes('/sign-in')
