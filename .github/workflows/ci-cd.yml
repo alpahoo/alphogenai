@@ -62,7 +62,7 @@ jobs:
           PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://||' | sed 's|\.supabase\.co||')
           # Use Supabase Management API to execute migration
           curl -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d "{\"query\": $(echo "$MIGRATION_SQL" | jq -Rs .)}" \
             --fail-with-body || echo "Migration execution completed with warnings"
@@ -129,8 +129,8 @@ jobs:
           if [ -n "$ACCESS_TOKEN" ]; then
             echo "✅ Authentication successful"
 
-            # Test job creation
-            JOB_RESPONSE=$(curl -s -X POST "https://your-app-url.vercel.app/api/jobs" \
+            # Test job creation (using localhost since we don't have deployed URL yet)
+            JOB_RESPONSE=$(curl -s -X POST "http://localhost:3000/api/jobs" \
               -H "Authorization: Bearer $ACCESS_TOKEN" \
               -H "Content-Type: application/json" \
               -d '{"prompt":"Test video generation"}')
@@ -144,7 +144,7 @@ jobs:
               echo "✅ Job creation successful: $JOB_ID"
 
               # Test job retrieval
-              GET_RESPONSE=$(curl -s -X GET "https://your-app-url.vercel.app/api/jobs/$JOB_ID" \
+              GET_RESPONSE=$(curl -s -X GET "http://localhost:3000/api/jobs/$JOB_ID" \
                 -H "Authorization: Bearer $ACCESS_TOKEN")
 
               echo "Job retrieval response: $GET_RESPONSE"
