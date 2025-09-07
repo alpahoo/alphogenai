@@ -18,6 +18,10 @@ export default function Login() {
     try {
       const response = await api.login(email, password)
       api.setToken(response.token)
+      
+      const { setAuthToken } = await import('../lib/interceptor')
+      setAuthToken(response.token)
+      
       router.push('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')

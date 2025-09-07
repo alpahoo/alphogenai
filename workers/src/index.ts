@@ -101,51 +101,78 @@ async function supabaseRequest(env: Env, method: string, table: string, data?: a
   
   if (!response.ok) {
     const errorText = await response.text()
-    console.error(`Supabase ${method} ${table} failed:`, response.status, response.statusText, errorText)
-    console.error(`Request URL: ${url}`)
-    console.error(`Request headers:`, headers)
-    throw new Error(`Supabase error: ${response.status} ${response.statusText}`)
+    console.error(`❌ SUPABASE ERROR: ${method} ${table} failed`)
+    console.error(`❌ Status: ${response.status} ${response.statusText}`)
+    console.error(`❌ URL: ${url}`)
+    console.error(`❌ Headers:`, JSON.stringify(headers, null, 2))
+    console.error(`❌ Error Response:`, errorText)
+    
+    try {
+      const errorJson = JSON.parse(errorText)
+      console.error(`❌ Parsed Error:`, JSON.stringify(errorJson, null, 2))
+      if (errorJson.message) {
+        console.error(`❌ Error Message: ${errorJson.message}`)
+      }
+      if (errorJson.details) {
+        console.error(`❌ Error Details: ${errorJson.details}`)
+      }
+      if (errorJson.hint) {
+        console.error(`❌ Error Hint: ${errorJson.hint}`)
+      }
+    } catch (parseError) {
+      console.error(`❌ Could not parse error response as JSON`)
+    }
+    
+    throw new Error(`Supabase ${method} ${table} error: ${response.status} ${response.statusText} - ${errorText}`)
   }
 
   return response.json()
 }
 
 async function createUser(env: Env, email: string, passwordHash: string): Promise<User> {
-  const user = {
-    id: generateId(),
-    email,
-    password_hash: passwordHash,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+  if (!isSupabaseConfigured(env)) {
+    throw new Error('Database not configured - service unavailable')
   }
 
-  console.log(`DEBUG: Creating user ${email} with service_role auth`)
-  console.log(`DEBUG: Password hash length: ${passwordHash.length}`)
-  console.log(`DEBUG: Generated user ID: ${user.id}`)
+  try {
+    const signupResponse = await fetch(`${env.SUPABASE_URL}/auth/v1/signup`, {
+      method: 'POST',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email,
+        password: 'temp_password_' + Date.now(),
+        email_confirm: true
+      })
+    })
 
-  if (isSupabaseConfigured(env)) {
-    try {
-      console.log(`DEBUG: Attempting to create user in Supabase with service_role`)
-      const [created] = await supabaseRequest(env, 'POST', 'users', user)
-      console.log(`DEBUG: User created successfully in Supabase: ${created.id}`)
-      console.log(`DEBUG: Supabase returned user email: ${created.email}`)
-      console.log(`DEBUG: Supabase returned password_hash length: ${created.password_hash?.length}`)
-      
-      users.set(created.id, created)
-      console.log(`DEBUG: User also stored in memory for consistency`)
-      
-      return created
-    } catch (error) {
-      console.error('Supabase createUser error:', error)
-      console.log(`DEBUG: Falling back to in-memory storage for user creation`)
-      // Fallback to in-memory storage if Supabase fails
-      users.set(user.id, user)
-      return user
+    if (!signupResponse.ok) {
+      const errorText = await signupResponse.text()
+      console.error('Supabase Auth signup failed:', signupResponse.status, errorText)
+      throw new Error(`Auth signup failed: ${signupResponse.status}`)
     }
-  } else {
-    console.log(`DEBUG: Supabase not configured, storing user in memory`)
+
+    const authUser = await signupResponse.json()
+    const userId = authUser.user.id
+
+    console.log(`✅ Created auth.users entry with ID: ${userId}`)
+
+    const user = {
+      id: userId,
+      email,
+      password_hash: passwordHash,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
     users.set(user.id, user)
     return user
+  } catch (error) {
+    console.error('Failed to create user in Supabase Auth:', error)
+    throw error
   }
 }
 
@@ -238,9 +265,8 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
     user_id: userId,
     prompt,
     status: 'queued' as const,
-    result_url: null,
-    error_message: null,
-    runpod_job_id: null,
+    progress: 0,
+    result_r2_key: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
@@ -253,12 +279,13 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
     console.log(`✅ Job ${job.id} created successfully in Supabase`)
     console.log(`🔍 DIAGNOSTIC POST: inserted_user_id=${userId}, job_id=${job.id}`)
     
-    console.log(`🔍 Verifying job exists immediately after creation...`)
+    console.log(`🔍 Verifying job exists immediately after creation (service_role, no filter)...`)
     const verifyResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${job.id}`)
     console.log(`🔍 DIAGNOSTIC VERIFY: job_id=${job.id}, rows_found=${verifyResult.length}, exists=${verifyResult.length > 0}`)
     
     if (verifyResult.length > 0) {
       console.log(`✅ Job ${job.id} confirmed to exist in database`)
+      console.log(`🔍 VERIFY DATA:`, JSON.stringify(verifyResult[0], null, 2))
     } else {
       console.error(`❌ Job ${job.id} NOT found in database immediately after creation!`)
     }
@@ -267,8 +294,14 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
     await triggerRunpodJob(env, created)
     return created
   } catch (error) {
-    console.error(`❌ Error creating job in Supabase:`, error)
-    throw error
+    console.error(`❌ CRITICAL: Job creation failed in createJob function`)
+    console.error(`❌ Error type:`, error?.constructor?.name || 'Unknown')
+    console.error(`❌ Error message:`, (error as any)?.message || 'No message')
+    console.error(`❌ Full error:`, error)
+    console.error(`❌ User ID:`, userId)
+    console.error(`❌ Job data:`, JSON.stringify(job, null, 2))
+    
+    throw new Error(`Job creation failed: ${(error as any)?.message || 'Unknown error'}`)
   }
 }
 
@@ -280,32 +313,31 @@ async function getJobForUser(env: Env, jobId: string, userId: string): Promise<J
     throw new Error('Database not configured - service unavailable')
   }
   
-  console.log(`📖 Querying Supabase for job ${jobId}`)
   console.log(`🔍 DIAGNOSTIC GET: job_id=${jobId}, jwt_sub=${userId}, query_user_id_used=${userId}`)
   
   try {
-    const jobsResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${jobId}&user_id=eq.${userId}`)
-    console.log(`🔍 DIAGNOSTIC GET: rows_found=${jobsResult.length}`)
-    console.log(`📊 Supabase returned ${jobsResult.length} jobs for query`)
+    const result = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${jobId}`)
+    console.log(`🔍 DIAGNOSTIC GET: rows_found=${result.length}`)
     
-    if (jobsResult.length > 0) {
-      console.log(`✅ Job ${jobId} found in Supabase`)
-      return jobsResult[0]
-    }
-    
-    console.log(`🔍 Testing unfiltered query to check if job exists at all...`)
-    const unfilteredResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${jobId}`)
-    console.log(`🔍 DIAGNOSTIC UNFILTERED: job exists=${unfilteredResult.length > 0}, owner_user_id=${unfilteredResult.length > 0 ? unfilteredResult[0].user_id : 'N/A'}`)
-    
-    if (unfilteredResult.length > 0 && unfilteredResult[0].user_id !== userId) {
-      console.log(`❌ OWNERSHIP MISMATCH: job.user_id=${unfilteredResult[0].user_id} !== jwt.sub=${userId}`)
+    if (result.length > 0) {
+      const job = result[0]
+      console.log(`🔍 Found job - job.user_id=${job.user_id}, jwt.userId=${userId}`)
+      
+      if (job.user_id !== userId) {
+        console.log(`❌ Job ${jobId} ownership check failed - job.user_id=${job.user_id} !== jwt.userId=${userId}`)
+        return null
+      }
+      
+      console.log(`✅ Job ${jobId} found and ownership verified for user ${userId}`)
+      console.log(`🔍 Job data:`, JSON.stringify(job, null, 2))
+      jobs.set(job.id, job)
+      return job
+    } else {
+      console.log(`❌ Job ${jobId} not found in database at all`)
       return null
     }
-    
-    console.log(`❌ Job ${jobId} not found in database`)
-    return null
   } catch (error) {
-    console.error(`❌ Error querying Supabase for job:`, error)
+    console.error('Failed to get job from Supabase:', error)
     throw error
   }
 }
@@ -767,7 +799,7 @@ export default {
           runner_configured: !!(env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID),
           jwt_configured: isJWTConfigured(env)
         }), {
-          status: 200,
+          status: 201,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
