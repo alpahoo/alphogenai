@@ -554,7 +554,28 @@ async function handleJobs(request: Request, env: Env): Promise<Response> {
       })
     } catch (error) {
       console.error(`❌ POST /api/jobs: Job creation failed:`, error)
-      return new Response(JSON.stringify({ error: 'Failed to create job' }), {
+      console.error(`❌ POST /api/jobs: Error type:`, error?.constructor?.name || 'Unknown')
+      console.error(`❌ POST /api/jobs: Error message:`, (error as any)?.message || 'No message')
+      console.error(`❌ POST /api/jobs: User ID:`, decoded.sub)
+      console.error(`❌ POST /api/jobs: Prompt:`, prompt)
+      
+      const errorMessage = (error as any)?.message || 'Unknown error'
+      const isSupabaseError = errorMessage.includes('Supabase')
+      const isConstraintError = errorMessage.includes('constraint') || errorMessage.includes('foreign key')
+      const isRLSError = errorMessage.includes('RLS') || errorMessage.includes('policy')
+      
+      console.error(`❌ POST /api/jobs: Error analysis - Supabase: ${isSupabaseError}, Constraint: ${isConstraintError}, RLS: ${isRLSError}`)
+      
+      return new Response(JSON.stringify({ 
+        error: 'Failed to create job',
+        debug: {
+          message: errorMessage,
+          user_id: decoded.sub,
+          supabase_error: isSupabaseError,
+          constraint_error: isConstraintError,
+          rls_error: isRLSError
+        }
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
