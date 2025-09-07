@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 
 import { Env } from './Env';
 
@@ -10,6 +9,7 @@ export const supabase = createClient(
 );
 
 export const createServerSupabaseClient = () => {
+  const { cookies } = require('next/headers');
   const cookieStore = cookies();
 
   return createServerClient(

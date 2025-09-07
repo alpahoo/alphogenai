@@ -1,33 +1,27 @@
-import { OrganizationProfile } from '@clerk/nextjs';
-import { useTranslations } from 'next-intl';
+'use client';
+
+import { useRouter } from 'next/navigation';
 
 import { TitleBar } from '@/features/dashboard/TitleBar';
-import { getI18nPath } from '@/utils/Helpers';
 
 const OrganizationProfilePage = (props: { params: { locale: string } }) => {
-  const t = useTranslations('OrganizationProfile');
+  const router = useRouter();
+
+  router.push(`/${props.params.locale}/dashboard/user-profile`);
 
   return (
     <>
       <TitleBar
-        title={t('title_bar')}
-        description={t('title_bar_description')}
+        title="Organization Profile"
+        description="Redirecting to user profile..."
       />
 
-      <OrganizationProfile
-        routing="path"
-        path={getI18nPath(
-          '/dashboard/organization-profile',
-          props.params.locale,
-        )}
-        afterLeaveOrganizationUrl="/onboarding/organization-selection"
-        appearance={{
-          elements: {
-            rootBox: 'w-full',
-            cardBox: 'w-full flex',
-          },
-        }}
-      />
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-gray-600">AlphoGenAI uses individual accounts.</p>
+          <p className="text-gray-600">Redirecting to your user profile...</p>
+        </div>
+      </div>
     </>
   );
 };
