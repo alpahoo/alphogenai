@@ -31,7 +31,7 @@ if (typeof window !== 'undefined') {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
     
-    if (url.includes('/api/jobs') || (url.includes('/api/') && !url.includes('/api/auth/'))) {
+    if (url.includes('/api/jobs')) {
       const token = getAuthToken()
       if (token) {
         init = init || {}

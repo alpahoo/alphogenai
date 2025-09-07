@@ -60,9 +60,9 @@ jobs:
           
           if [ "$JOB_HTTP_CODE" = "201" ]; then
             echo "✅ Job creation successful"
-            JOB_ID=$(echo "$JOB_BODY" | jq -r '.job.id')
-            JOB_STATUS=$(echo "$JOB_BODY" | jq -r '.job.status')
-            JOB_USER_ID=$(echo "$JOB_BODY" | jq -r '.job.user_id')
+            JOB_ID=$(echo "$JOB_BODY" | jq -r '.id')
+            JOB_STATUS=$(echo "$JOB_BODY" | jq -r '.status')
+            JOB_USER_ID=$(echo "$JOB_BODY" | jq -r '.user_id')
             echo "Job ID: $JOB_ID"
             echo "Job Status: $JOB_STATUS"
             echo "Job User ID: $JOB_USER_ID"
@@ -92,9 +92,9 @@ jobs:
           
           if [ "$GET_HTTP_CODE" = "200" ]; then
             echo "✅ Job retrieval successful"
-            RETRIEVED_JOB_ID=$(echo "$GET_BODY" | jq -r '.job.id')
-            RETRIEVED_STATUS=$(echo "$GET_BODY" | jq -r '.job.status')
-            RETRIEVED_USER_ID=$(echo "$GET_BODY" | jq -r '.job.user_id')
+            RETRIEVED_JOB_ID=$(echo "$GET_BODY" | jq -r '.id')
+            RETRIEVED_STATUS=$(echo "$GET_BODY" | jq -r '.status')
+            RETRIEVED_USER_ID=$(echo "$GET_BODY" | jq -r '.user_id')
             echo "Retrieved Job ID: $RETRIEVED_JOB_ID"
             echo "Retrieved Status: $RETRIEVED_STATUS"
             echo "Retrieved User ID: $RETRIEVED_USER_ID"

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
-import { api } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
+import { setAuthToken } from '@/lib/interceptor'
 
 export default function Login() {
   const router = useRouter()
@@ -16,13 +17,19 @@ export default function Login() {
     setError('')
 
     try {
-      const response = await api.login(email, password)
-      api.setToken(response.token)
-      
-      const { setAuthToken } = await import('../lib/interceptor')
-      setAuthToken(response.token)
-      
-      router.push('/dashboard')
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        throw new Error(error.message)
+      }
+
+      if (data.session) {
+        setAuthToken(data.session.access_token)
+        router.push('/dashboard')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {

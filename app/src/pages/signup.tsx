@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
-import { api } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
+import { setAuthToken } from '@/lib/interceptor'
 
 export default function Signup() {
   const router = useRouter()
@@ -23,13 +24,21 @@ export default function Signup() {
     }
 
     try {
-      const response = await api.signup(email, password)
-      api.setToken(response.token)
-      
-      const { setAuthToken } = await import('../lib/interceptor')
-      setAuthToken(response.token)
-      
-      router.push('/dashboard')
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      })
+
+      if (error) {
+        throw new Error(error.message)
+      }
+
+      if (data.session) {
+        setAuthToken(data.session.access_token)
+        router.push('/dashboard')
+      } else {
+        setError('Please check your email to confirm your account')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed')
     } finally {
