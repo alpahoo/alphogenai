@@ -1,10 +1,10 @@
+import { createServerClient } from '@supabase/ssr';
 import {
   type NextFetchEvent,
   type NextRequest,
   NextResponse,
 } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
-import { createServerClient } from '@supabase/ssr';
 
 import { AllLocales, AppConfig } from './utils/AppConfig';
 
@@ -15,9 +15,9 @@ const intlMiddleware = createMiddleware({
 });
 
 const isProtectedRoute = (pathname: string) => {
-  return pathname.includes('/dashboard') || 
-         pathname.includes('/onboarding') ||
-         pathname.includes('/api');
+  return pathname.includes('/dashboard')
+    || pathname.includes('/onboarding')
+    || pathname.includes('/api');
 };
 
 export default async function middleware(

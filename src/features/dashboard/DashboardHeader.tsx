@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
+import { useEffect, useState } from 'react';
 
 import { ActiveLink } from '@/components/ActiveLink';
 import { LocaleSwitcher } from '@/components/LocaleSwitcher';
@@ -15,8 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
-import { Logo } from '@/templates/Logo';
 import { supabase } from '@/libs/supabase';
+import { Logo } from '@/templates/Logo';
 
 export const DashboardHeader = (props: {
   menu: {
@@ -117,7 +117,7 @@ export const DashboardHeader = (props: {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-gray-100">
-                  <div className="size-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs">
+                  <div className="flex size-6 items-center justify-center rounded-full bg-indigo-600 text-xs text-white">
                     {user?.email?.charAt(0).toUpperCase() || 'U'}
                   </div>
                   <span className="max-w-24 truncate">{user?.email}</span>
