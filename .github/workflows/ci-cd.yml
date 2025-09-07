@@ -11,22 +11,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-      
+          cache: npm
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run linting
         run: npm run lint
-      
+
       - name: Run type checking
         run: npm run type-check
-      
+
       - name: Build application
         run: npm run build
         env:
@@ -42,18 +42,18 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/pivot/saas-boilerplate'
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Apply Supabase Migration
         run: |
           MIGRATION_SQL=$(cat migrations/0001_jobs.sql)
-          
+
           curl -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/exec_sql" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
             -H "Content-Type: application/json" \
             -d "{\"sql\": $(echo "$MIGRATION_SQL" | jq -Rs .)}" \
             --fail-with-body || echo "Migration execution completed"
-          
+
           echo "Reloading PostgREST schema cache..."
           curl -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/pgrst_reload_schema" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
@@ -67,16 +67,16 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/pivot/saas-boilerplate'
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-      
+          cache: npm
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build for production
         run: npm run build
         env:
@@ -85,7 +85,7 @@ jobs:
           SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
           RUNPOD_ENDPOINT_ID: ${{ secrets.RUNPOD_ENDPOINT_ID }}
-      
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:
@@ -100,32 +100,32 @@ jobs:
     needs: deploy_pages
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Test Authentication Flow
         run: |
           echo "Testing signup and authentication..."
-          
+
           # Test signup
           SIGNUP_RESPONSE=$(curl -s -w "%{http_code}" -X POST \
             "${{ secrets.SUPABASE_URL }}/auth/v1/signup" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{"email":"test-'$(date +%s)'@example.com","password":"testpass123"}')
-          
+
           echo "Signup response: $SIGNUP_RESPONSE"
-          
+
           # Test job creation and retrieval
           echo "Testing jobs API..."
-          
+
           # Create test job
           JOB_RESPONSE=$(curl -s -X POST \
             "https://alphogenai.pages.dev/api/jobs" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
             -d '{"prompt":"Test video generation"}')
-          
+
           echo "Job creation response: $JOB_RESPONSE"
-          
+
           # Extract job ID and test retrieval
           JOB_ID=$(echo "$JOB_RESPONSE" | jq -r '.job.id // empty')
           if [ -n "$JOB_ID" ]; then
