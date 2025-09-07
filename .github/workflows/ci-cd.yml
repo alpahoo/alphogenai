@@ -108,56 +108,56 @@ jobs:
       - name: Verify Database Schema
         run: |
           echo "✅ Migration deployment successful - verifying database schema"
-          
+
           # Extract project ref from SUPABASE_URL
           PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://||' | sed 's|\.supabase\.co||')
-          
+
           # Test that jobs table exists and has correct structure
           SCHEMA_CHECK=$(curl -s -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d '{"query": "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '\''jobs'\'' AND table_schema = '\''public'\'' ORDER BY ordinal_position;"}')
-          
+
           echo "Jobs table schema: $SCHEMA_CHECK"
-          
+
           # Test that RLS policies exist
           RLS_CHECK=$(curl -s -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d '{"query": "SELECT policyname FROM pg_policies WHERE tablename = '\''jobs'\'';"}')
-          
+
           echo "RLS policies: $RLS_CHECK"
-          
+
           # Test basic Supabase Auth functionality
           echo "Testing Supabase Auth endpoints..."
-          
+
           # Use a unique email for testing
           TEST_EMAIL="ci-test-$(date +%s)@devin-test.com"
           echo "Using test email: $TEST_EMAIL"
-          
+
           # Test signup
           SIGNUP_RESPONSE=$(curl -s -X POST "${{ secrets.SUPABASE_URL }}/auth/v1/signup" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "Content-Type: application/json" \
             -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"testpass123\"}")
-          
+
           echo "Signup response: $SIGNUP_RESPONSE"
-          
+
           # Check if signup was successful (either user created or already exists)
           if echo "$SIGNUP_RESPONSE" | jq -e '.user // .id' > /dev/null 2>&1; then
             echo "✅ Supabase Auth signup working"
-            
+
             # Test login
             LOGIN_RESPONSE=$(curl -s -X POST "${{ secrets.SUPABASE_URL }}/auth/v1/token?grant_type=password" \
               -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
               -H "Content-Type: application/json" \
               -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"testpass123\"}")
-            
+
             echo "Login response: $LOGIN_RESPONSE"
-            
+
             # Extract access token
             ACCESS_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.access_token // empty')
-            
+
             if [ -n "$ACCESS_TOKEN" ] && [ "$ACCESS_TOKEN" != "null" ]; then
               echo "✅ Supabase Auth login working - token obtained"
               echo "✅ Database migration and authentication verification complete"
