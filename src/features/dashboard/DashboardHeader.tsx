@@ -116,7 +116,7 @@ export const DashboardHeader = (props: {
           <li>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-gray-100">
+                <button type="button" className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-gray-100">
                   <div className="flex size-6 items-center justify-center rounded-full bg-indigo-600 text-xs text-white">
                     {user?.email?.charAt(0).toUpperCase() || 'U'}
                   </div>

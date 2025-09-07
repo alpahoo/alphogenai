@@ -70,17 +70,17 @@ const UserProfilePage = (props: { params: { locale: string } }) => {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <div className="block text-sm font-medium text-gray-700">Email</div>
               <div className="mt-1 text-sm text-gray-900">{user?.email}</div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">User ID</label>
+              <div className="block text-sm font-medium text-gray-700">User ID</div>
               <div className="mt-1 font-mono text-sm text-gray-500">{user?.id}</div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Created</label>
+              <div className="block text-sm font-medium text-gray-700">Created</div>
               <div className="mt-1 text-sm text-gray-500">
                 {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
               </div>
@@ -127,6 +127,7 @@ const UserProfilePage = (props: { params: { locale: string } }) => {
           <h3 className="mb-4 text-lg font-medium text-gray-900">Account Actions</h3>
 
           <button
+            type="button"
             onClick={handleSignOut}
             className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
