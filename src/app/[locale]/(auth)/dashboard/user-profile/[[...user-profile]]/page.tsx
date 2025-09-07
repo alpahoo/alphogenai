@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 import { TitleBar } from '@/features/dashboard/TitleBar';
 import { supabase } from '@/libs/supabase';
@@ -66,21 +66,21 @@ const UserProfilePage = (props: { params: { locale: string } }) => {
 
       <div className="max-w-2xl space-y-6">
         <div className="rounded-lg border bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Account Information</h3>
-          
+          <h3 className="mb-4 text-lg font-medium text-gray-900">Account Information</h3>
+
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <div className="block text-sm font-medium text-gray-700">Email</div>
               <div className="mt-1 text-sm text-gray-900">{user?.email}</div>
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-gray-700">User ID</label>
-              <div className="mt-1 text-sm text-gray-500 font-mono">{user?.id}</div>
+              <div className="block text-sm font-medium text-gray-700">User ID</div>
+              <div className="mt-1 font-mono text-sm text-gray-500">{user?.id}</div>
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-gray-700">Created</label>
+              <div className="block text-sm font-medium text-gray-700">Created</div>
               <div className="mt-1 text-sm text-gray-500">
                 {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
               </div>
@@ -89,8 +89,8 @@ const UserProfilePage = (props: { params: { locale: string } }) => {
         </div>
 
         <div className="rounded-lg border bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Change Password</h3>
-          
+          <h3 className="mb-4 text-lg font-medium text-gray-900">Change Password</h3>
+
           <form onSubmit={handleUpdatePassword} className="space-y-4">
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
@@ -106,17 +106,17 @@ const UserProfilePage = (props: { params: { locale: string } }) => {
                 placeholder="Enter new password"
               />
             </div>
-            
+
             {message && (
               <div className={`text-sm ${message.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
                 {message}
               </div>
             )}
-            
+
             <button
               type="submit"
               disabled={updating}
-              className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+              className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
             >
               {updating ? 'Updating...' : 'Update Password'}
             </button>
@@ -124,11 +124,12 @@ const UserProfilePage = (props: { params: { locale: string } }) => {
         </div>
 
         <div className="rounded-lg border bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Account Actions</h3>
-          
+          <h3 className="mb-4 text-lg font-medium text-gray-900">Account Actions</h3>
+
           <button
+            type="button"
             onClick={handleSignOut}
-            className="inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
             Sign Out
           </button>

@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 import { supabase } from '@/libs/supabase';
 
@@ -12,7 +12,7 @@ export default function CenteredLayout(props: { children: React.ReactNode }) {
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (user) {
         router.push('/dashboard');
       } else {

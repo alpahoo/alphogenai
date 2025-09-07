@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 import { createServerSupabaseClient } from '@/libs/supabase';
 
@@ -7,10 +8,10 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
-    const supabase = createServerSupabaseClient();
-    
+    const supabase = await createServerSupabaseClient();
+
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -32,7 +33,8 @@ export async function GET(
     }
 
     return NextResponse.json({ job });
-  } catch (error) {
+  } catch (err) {
+    console.error('Error fetching job:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
-import { TitleBar } from '@/features/dashboard/TitleBar';
 import { JobsList } from '@/features/dashboard/JobsList';
+import { TitleBar } from '@/features/dashboard/TitleBar';
 
 const DashboardIndexPage = () => {
   return (
