@@ -57,10 +57,9 @@ jobs:
       - name: Apply Supabase Migration
         run: |
           MIGRATION_SQL=$(cat migrations/0001_jobs.sql)
-          
+
           # Extract project ref from SUPABASE_URL (format: https://PROJECT_REF.supabase.co)
           PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://||' | sed 's|\.supabase\.co||')
-          
           # Use Supabase Management API to execute migration
           curl -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
