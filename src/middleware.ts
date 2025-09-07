@@ -1,10 +1,10 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import {
   type NextFetchEvent,
   type NextRequest,
   NextResponse,
 } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
+import { createServerClient } from '@supabase/ssr';
 
 import { AllLocales, AppConfig } from './utils/AppConfig';
 
@@ -14,55 +14,72 @@ const intlMiddleware = createMiddleware({
   defaultLocale: AppConfig.defaultLocale,
 });
 
-const isProtectedRoute = createRouteMatcher([
-  '/dashboard(.*)',
-  '/:locale/dashboard(.*)',
-  '/onboarding(.*)',
-  '/:locale/onboarding(.*)',
-  '/api(.*)',
-  '/:locale/api(.*)',
-]);
+const isProtectedRoute = (pathname: string) => {
+  return pathname.includes('/dashboard') || 
+         pathname.includes('/onboarding') ||
+         pathname.includes('/api');
+};
 
-export default function middleware(
+export default async function middleware(
   request: NextRequest,
   event: NextFetchEvent,
 ) {
   if (
     request.nextUrl.pathname.includes('/sign-in')
     || request.nextUrl.pathname.includes('/sign-up')
-    || isProtectedRoute(request)
+    || isProtectedRoute(request.nextUrl.pathname)
   ) {
-    return clerkMiddleware(async (auth, req) => {
-      if (isProtectedRoute(req)) {
-        const locale
-          = req.nextUrl.pathname.match(/(\/.*)\/dashboard/)?.at(1) ?? '';
+    const response = NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    });
 
-        const signInUrl = new URL(`${locale}/sign-in`, req.url);
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return request.cookies.get(name)?.value;
+          },
+          set(name: string, value: string, options: any) {
+            request.cookies.set({
+              name,
+              value,
+              ...options,
+            });
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+            });
+          },
+          remove(name: string, options: any) {
+            request.cookies.set({
+              name,
+              value: '',
+              ...options,
+            });
+            response.cookies.set({
+              name,
+              value: '',
+              ...options,
+            });
+          },
+        },
+      },
+    );
 
-        await auth.protect({
-          // `unauthenticatedUrl` is needed to avoid error: "Unable to find `next-intl` locale because the middleware didn't run on this request"
-          unauthenticatedUrl: signInUrl.toString(),
-        });
-      }
+    const { data: { user } } = await supabase.auth.getUser();
 
-      const authObj = await auth();
+    if (isProtectedRoute(request.nextUrl.pathname) && !user) {
+      const locale = request.nextUrl.pathname.match(/(\/.*)\/dashboard/)?.at(1) ?? '';
+      const signInUrl = new URL(`${locale}/sign-in`, request.url);
+      return NextResponse.redirect(signInUrl);
+    }
 
-      if (
-        authObj.userId
-        && !authObj.orgId
-        && req.nextUrl.pathname.includes('/dashboard')
-        && !req.nextUrl.pathname.endsWith('/organization-selection')
-      ) {
-        const orgSelection = new URL(
-          '/onboarding/organization-selection',
-          req.url,
-        );
-
-        return NextResponse.redirect(orgSelection);
-      }
-
-      return intlMiddleware(req);
-    })(request, event);
+    return intlMiddleware(request);
   }
 
   return intlMiddleware(request);

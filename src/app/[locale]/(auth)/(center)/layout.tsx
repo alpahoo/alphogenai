@@ -1,11 +1,46 @@
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
+'use client';
 
-export default async function CenteredLayout(props: { children: React.ReactNode }) {
-  const { userId } = await auth();
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-  if (userId) {
-    redirect('/dashboard');
+import { supabase } from '@/libs/supabase';
+
+export default function CenteredLayout(props: { children: React.ReactNode }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        router.push('/dashboard');
+      } else {
+        setLoading(false);
+      }
+    };
+
+    checkUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session?.user) {
+          router.push('/dashboard');
+        } else {
+          setLoading(false);
+        }
+      },
+    );
+
+    return () => subscription.unsubscribe();
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">Loading...</div>
+      </div>
+    );
   }
 
   return (

@@ -1,8 +1,9 @@
 'use client';
 
-import { OrganizationSwitcher, UserButton } from '@clerk/nextjs';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
+import { useRouter } from 'next/navigation';
 
 import { ActiveLink } from '@/components/ActiveLink';
 import { LocaleSwitcher } from '@/components/LocaleSwitcher';
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { Logo } from '@/templates/Logo';
-import { getI18nPath } from '@/utils/Helpers';
+import { supabase } from '@/libs/supabase';
 
 export const DashboardHeader = (props: {
   menu: {
@@ -24,6 +25,30 @@ export const DashboardHeader = (props: {
   }[];
 }) => {
   const locale = useLocale();
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      },
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push(`/${locale}/sign-in`);
+  };
 
   return (
     <>
@@ -44,21 +69,11 @@ export const DashboardHeader = (props: {
           <path d="M17 5 7 19" />
         </svg>
 
-        <OrganizationSwitcher
-          organizationProfileMode="navigation"
-          organizationProfileUrl={getI18nPath(
-            '/dashboard/organization-profile',
-            locale,
-          )}
-          afterCreateOrganizationUrl="/dashboard"
-          hidePersonal
-          skipInvitationScreen
-          appearance={{
-            elements: {
-              organizationSwitcherTrigger: 'max-w-28 sm:max-w-52',
-            },
-          }}
-        />
+        <div className="ml-3 flex items-center">
+          <span className="text-sm text-gray-600">
+            AlphoGenAI
+          </span>
+        </div>
 
         <nav className="ml-3 max-lg:hidden">
           <ul className="flex flex-row items-center gap-x-3 text-lg font-medium [&_a:hover]:opacity-100 [&_a]:opacity-75">
@@ -90,8 +105,6 @@ export const DashboardHeader = (props: {
             </div>
           </li>
 
-          {/* PRO: Dark mode toggle button */}
-
           <li data-fade>
             <LocaleSwitcher />
           </li>
@@ -101,15 +114,24 @@ export const DashboardHeader = (props: {
           </li>
 
           <li>
-            <UserButton
-              userProfileMode="navigation"
-              userProfileUrl="/dashboard/user-profile"
-              appearance={{
-                elements: {
-                  rootBox: 'px-2 py-1.5',
-                },
-              }}
-            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-gray-100">
+                  <div className="size-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs">
+                    {user?.email?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  <span className="max-w-24 truncate">{user?.email}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/user-profile">Profile</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </li>
         </ul>
       </div>
