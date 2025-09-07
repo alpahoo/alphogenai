@@ -57,11 +57,14 @@ jobs:
       - name: Apply Supabase Migration
         run: |
           MIGRATION_SQL=$(cat migrations/0001_jobs.sql)
-          curl -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/exec" \
-            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
+
+          # Extract project ref from SUPABASE_URL (format: https://PROJECT_REF.supabase.co)
+          PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://||' | sed 's|\.supabase\.co||')
+          # Use Supabase Management API to execute migration
+          curl -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
             -H "Content-Type: application/json" \
-            -d "{\"sql\": $(echo "$MIGRATION_SQL" | jq -Rs .)}" \
+            -d "{\"query\": $(echo "$MIGRATION_SQL" | jq -Rs .)}" \
             --fail-with-body || echo "Migration execution completed with warnings"
 
   deploy:
