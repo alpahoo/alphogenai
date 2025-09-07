@@ -43,3 +43,29 @@ CREATE POLICY "Service role full access jobs" ON jobs
     FOR ALL USING (
         auth.role() = 'service_role'
     );
+
+NOTIFY pgrst, 'reload schema';
+
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS _touch int;
+ALTER TABLE public.jobs DROP COLUMN IF EXISTS _touch;
+
+CREATE OR REPLACE FUNCTION create_job_with_defaults(
+  p_user_id uuid,
+  p_prompt text
+) RETURNS TABLE(
+  id uuid,
+  user_id uuid,
+  prompt text,
+  status text,
+  progress int,
+  result_r2_key text,
+  created_at timestamptz,
+  updated_at timestamptz
+) LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  RETURN QUERY
+  INSERT INTO jobs (user_id, prompt, status, progress, result_r2_key, created_at, updated_at)
+  VALUES (p_user_id, p_prompt, 'queued', 0, NULL, NOW(), NOW())
+  RETURNING jobs.id, jobs.user_id, jobs.prompt, jobs.status, jobs.progress, jobs.result_r2_key, jobs.created_at, jobs.updated_at;
+END;
+$$;

@@ -138,20 +138,19 @@ async function createUser(env: Env, email: string, passwordHash: string): Promis
     throw new Error('Database not configured - service unavailable')
   }
 
-  const userId = generateId()
   const user = {
-    id: userId,
     email,
     password_hash: passwordHash,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
 
-  console.log(`🔧 Creating user ${email} with custom users.id: ${userId}`)
+  console.log(`🔧 Creating user ${email} - letting database generate users.id`)
 
   try {
     const [created] = await supabaseRequest(env, 'POST', 'users', user)
-    console.log(`✅ User created in custom users table with ID: ${created.id}`)
+    console.log(`✅ User created with database-generated ID: ${created.id}`)
+    console.log(`🔐 JWT will use database users.id: ${created.id}`)
     users.set(created.id, created)
     return created
   } catch (error) {
@@ -209,50 +208,62 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
     throw new Error('Database not configured - service unavailable')
   }
   
-  const job = {
-    user_id: userId,
-    prompt,
-  }
-
   console.log(`🎬 Creating job for user ${userId}`)
-  console.log(`🔍 DIAGNOSTIC CREATE: user_id=${userId}, prompt="${prompt}"`)
+  console.log(`🔍 DIAGNOSTIC CREATE: user_id=${userId} (from JWT.sub), prompt="${prompt}"`)
   console.log(`📝 Inserting job into Supabase with service_role`)
   
   try {
-    console.log(`🔍 DIAGNOSTIC: Using ultra-minimal approach to bypass PostgREST cache issue...`)
-    
-    const minimalJob = {
+    console.log(`🔍 DIAGNOSTIC: Attempting REST approach first...`)
+    const jobData = {
       user_id: userId,
-      prompt: prompt
+      prompt: prompt,
+      status: 'queued'
     }
     
-    console.log(`🔍 DIAGNOSTIC: Ultra-minimal job creation:`, JSON.stringify(minimalJob, null, 2))
-    const [created] = await supabaseRequest(env, 'POST', 'jobs', minimalJob)
-    console.log(`✅ Job ${created.id} created successfully with minimal approach`)
-    console.log(`🔍 DIAGNOSTIC CREATE: inserted_user_id=${created.user_id}`)
-    
-    console.log(`🔍 POST-INSERT: Verifying job exists with SELECT by id`)
-    const verifyResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${created.id}`)
-    console.log(`🔍 POST-INSERT: verification found ${verifyResult.length} jobs`)
-    
-    if (verifyResult.length === 0) {
-      console.error(`❌ CRITICAL: Job ${created.id} not found immediately after creation!`)
-      throw new Error('Job creation verification failed')
+    try {
+      console.log(`🔍 DIAGNOSTIC: Job creation with explicit status:`, JSON.stringify(jobData, null, 2))
+      const [created] = await supabaseRequest(env, 'POST', 'jobs', jobData)
+      console.log(`✅ Job ${created.id} created successfully via REST`)
+      console.log(`🔍 DIAGNOSTIC CREATE: inserted_user_id=${created.user_id}, status=${created.status}`)
+      
+      await triggerRunpodJob(env, created)
+      return created
+    } catch (restError) {
+      console.error(`❌ REST approach failed:`, (restError as any)?.message)
+      
+      if ((restError as any)?.message?.includes('PGRST204')) {
+        console.log(`🔄 FALLBACK: Using RPC stored procedure to bypass PostgREST cache...`)
+        
+        const rpcResult = await supabaseRequest(env, 'POST', 'rpc/create_job_with_defaults', {
+          p_user_id: userId,
+          p_prompt: prompt
+        })
+        
+        if (rpcResult && rpcResult.length > 0) {
+          const created = rpcResult[0]
+          console.log(`✅ Job ${created.id} created via RPC stored procedure`)
+          console.log(`🔍 DIAGNOSTIC CREATE: inserted_user_id=${created.user_id}, status=${created.status}`)
+          
+          await triggerRunpodJob(env, created)
+          return created
+        } else {
+          throw new Error('RPC job creation failed - no result returned')
+        }
+      } else {
+        throw restError
+      }
     }
-    
-    const verifiedJob = verifyResult[0]
-    console.log(`✅ POST-INSERT: Job verified - id=${verifiedJob.id}, user_id=${verifiedJob.user_id}`)
-    
-    await triggerRunpodJob(env, verifiedJob)
-    return verifiedJob
     
   } catch (error) {
     console.error(`❌ CRITICAL: Job creation failed in createJob function`)
     console.error(`❌ Error type:`, error?.constructor?.name || 'Unknown')
-    console.error(`❌ Error message:`, (error as any)?.message || 'No message')
+    console.error(`❌ Error message:`, (error as any)?.message || 'Unknown error')
     console.error(`❌ Full error:`, error)
-    console.error(`❌ User ID:`, userId)
-    console.error(`❌ Job data:`, JSON.stringify(job, null, 2))
+    console.error(`❌ User ID from JWT.sub:`, userId)
+    
+    if ((error as any)?.message?.includes('PGRST204')) {
+      console.error(`❌ PostgREST schema cache issue detected - column not found in cache`)
+    }
     
     throw new Error(`Job creation failed: ${(error as any)?.message || 'Unknown error'}`)
   }
