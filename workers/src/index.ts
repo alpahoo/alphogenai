@@ -134,44 +134,24 @@ async function createUser(env: Env, email: string, passwordHash: string): Promis
     throw new Error('Database not configured - service unavailable')
   }
 
+  const userId = generateId()
+  const user = {
+    id: userId,
+    email,
+    password_hash: passwordHash,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
+  console.log(`🔧 Creating user ${email} with custom users.id: ${userId}`)
+
   try {
-    const signupResponse = await fetch(`${env.SUPABASE_URL}/auth/v1/signup`, {
-      method: 'POST',
-      headers: {
-        'apikey': env.SUPABASE_SERVICE_ROLE,
-        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email,
-        password: 'temp_password_' + Date.now(),
-        email_confirm: true
-      })
-    })
-
-    if (!signupResponse.ok) {
-      const errorText = await signupResponse.text()
-      console.error('Supabase Auth signup failed:', signupResponse.status, errorText)
-      throw new Error(`Auth signup failed: ${signupResponse.status}`)
-    }
-
-    const authUser = await signupResponse.json()
-    const userId = authUser.user.id
-
-    console.log(`✅ Created auth.users entry with ID: ${userId}`)
-
-    const user = {
-      id: userId,
-      email,
-      password_hash: passwordHash,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    users.set(user.id, user)
-    return user
+    const [created] = await supabaseRequest(env, 'POST', 'users', user)
+    console.log(`✅ User created in custom users table with ID: ${created.id}`)
+    users.set(created.id, created)
+    return created
   } catch (error) {
-    console.error('Failed to create user in Supabase Auth:', error)
+    console.error('Failed to create user in custom users table:', error)
     throw error
   }
 }
@@ -253,8 +233,6 @@ async function getUserById(env: Env, id: string): Promise<User | null> {
 }
 
 async function createJob(env: Env, userId: string, prompt: string): Promise<Job> {
-  console.log(`🎬 Creating job for user ${userId} with prompt: ${prompt.substring(0, 50)}...`)
-  
   if (!isSupabaseConfigured(env)) {
     console.error(`❌ PRODUCTION ERROR: Supabase not configured - DB is required in production`)
     throw new Error('Database not configured - service unavailable')
@@ -271,28 +249,29 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
     updated_at: new Date().toISOString(),
   }
 
-  console.log(`📝 Inserting job ${job.id} into Supabase for user ${userId}`)
-  console.log(`🔍 DIAGNOSTIC POST: About to insert job with user_id=${userId}, job_id=${job.id}`)
+  console.log(`🎬 Creating job for user ${userId}`)
+  console.log(`🔍 DIAGNOSTIC CREATE: user_id=${userId}, job_id=${job.id}`)
+  console.log(`📝 Inserting job into Supabase with service_role`)
   
   try {
     const [created] = await supabaseRequest(env, 'POST', 'jobs', job)
-    console.log(`✅ Job ${job.id} created successfully in Supabase`)
-    console.log(`🔍 DIAGNOSTIC POST: inserted_user_id=${userId}, job_id=${job.id}`)
+    console.log(`✅ Job ${created.id} created successfully in Supabase`)
+    console.log(`🔍 DIAGNOSTIC CREATE: inserted_user_id=${created.user_id}`)
     
-    console.log(`🔍 Verifying job exists immediately after creation (service_role, no filter)...`)
-    const verifyResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${job.id}`)
-    console.log(`🔍 DIAGNOSTIC VERIFY: job_id=${job.id}, rows_found=${verifyResult.length}, exists=${verifyResult.length > 0}`)
+    console.log(`🔍 POST-INSERT: Verifying job exists with SELECT by id`)
+    const verifyResult = await supabaseRequest(env, 'GET', 'jobs', null, `id=eq.${created.id}`)
+    console.log(`🔍 POST-INSERT: verification found ${verifyResult.length} jobs`)
     
-    if (verifyResult.length > 0) {
-      console.log(`✅ Job ${job.id} confirmed to exist in database`)
-      console.log(`🔍 VERIFY DATA:`, JSON.stringify(verifyResult[0], null, 2))
-    } else {
-      console.error(`❌ Job ${job.id} NOT found in database immediately after creation!`)
+    if (verifyResult.length === 0) {
+      console.error(`❌ CRITICAL: Job ${created.id} not found immediately after creation!`)
+      throw new Error('Job creation verification failed')
     }
     
-    jobs.set(created.id, created)
-    await triggerRunpodJob(env, created)
-    return created
+    const verifiedJob = verifyResult[0]
+    console.log(`✅ POST-INSERT: Job verified - id=${verifiedJob.id}, user_id=${verifiedJob.user_id}`)
+    
+    await triggerRunpodJob(env, verifiedJob)
+    return verifiedJob
   } catch (error) {
     console.error(`❌ CRITICAL: Job creation failed in createJob function`)
     console.error(`❌ Error type:`, error?.constructor?.name || 'Unknown')
@@ -330,7 +309,6 @@ async function getJobForUser(env: Env, jobId: string, userId: string): Promise<J
       
       console.log(`✅ Job ${jobId} found and ownership verified for user ${userId}`)
       console.log(`🔍 Job data:`, JSON.stringify(job, null, 2))
-      jobs.set(job.id, job)
       return job
     } else {
       console.log(`❌ Job ${jobId} not found in database at all`)
