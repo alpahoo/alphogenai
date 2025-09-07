@@ -1,0 +1,140 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useLocale } from 'next-intl';
+import { useRouter } from 'next/navigation';
+
+import { ActiveLink } from '@/components/ActiveLink';
+import { LocaleSwitcher } from '@/components/LocaleSwitcher';
+import { ToggleMenuButton } from '@/components/ToggleMenuButton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Separator } from '@/components/ui/separator';
+import { Logo } from '@/templates/Logo';
+import { supabase } from '@/libs/supabase';
+
+export const DashboardHeader = (props: {
+  menu: {
+    href: string;
+    label: string;
+  }[];
+}) => {
+  const locale = useLocale();
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_, session) => {
+        setUser(session?.user ?? null);
+      },
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push(`/${locale}/sign-in`);
+  };
+
+  return (
+    <>
+      <div className="flex items-center">
+        <Link href="/dashboard" className="max-sm:hidden">
+          <Logo />
+        </Link>
+
+        <svg
+          className="size-8 stroke-muted-foreground max-sm:hidden"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path stroke="none" d="M0 0h24v24H0z" />
+          <path d="M17 5 7 19" />
+        </svg>
+
+        <div className="ml-3 flex items-center">
+          <span className="text-sm text-gray-600">
+            AlphoGenAI
+          </span>
+        </div>
+
+        <nav className="ml-3 max-lg:hidden">
+          <ul className="flex flex-row items-center gap-x-3 text-lg font-medium [&_a:hover]:opacity-100 [&_a]:opacity-75">
+            {props.menu.map(item => (
+              <li key={item.href}>
+                <ActiveLink href={item.href}>{item.label}</ActiveLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+
+      <div>
+        <ul className="flex items-center gap-x-1.5 [&_li[data-fade]:hover]:opacity-100 [&_li[data-fade]]:opacity-60">
+          <li data-fade>
+            <div className="lg:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <ToggleMenuButton />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {props.menu.map(item => (
+                    <DropdownMenuItem key={item.href} asChild>
+                      <Link href={item.href}>{item.label}</Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </li>
+
+          <li data-fade>
+            <LocaleSwitcher />
+          </li>
+
+          <li>
+            <Separator orientation="vertical" className="h-4" />
+          </li>
+
+          <li>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-gray-100">
+                  <div className="size-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs">
+                    {user?.email?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  <span className="max-w-24 truncate">{user?.email}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/user-profile">Profile</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </li>
+        </ul>
+      </div>
+    </>
+  );
+};
