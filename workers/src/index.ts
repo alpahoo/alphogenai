@@ -219,8 +219,16 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
   console.log(`📝 Inserting job into Supabase with service_role`)
   
   try {
-    const [created] = await supabaseRequest(env, 'POST', 'jobs', job)
-    console.log(`✅ Job ${created.id} created successfully in Supabase`)
+    console.log(`🔍 DIAGNOSTIC: Using ultra-minimal approach to bypass PostgREST cache issue...`)
+    
+    const minimalJob = {
+      user_id: userId,
+      prompt: prompt
+    }
+    
+    console.log(`🔍 DIAGNOSTIC: Ultra-minimal job creation:`, JSON.stringify(minimalJob, null, 2))
+    const [created] = await supabaseRequest(env, 'POST', 'jobs', minimalJob)
+    console.log(`✅ Job ${created.id} created successfully with minimal approach`)
     console.log(`🔍 DIAGNOSTIC CREATE: inserted_user_id=${created.user_id}`)
     
     console.log(`🔍 POST-INSERT: Verifying job exists with SELECT by id`)
@@ -237,6 +245,7 @@ async function createJob(env: Env, userId: string, prompt: string): Promise<Job>
     
     await triggerRunpodJob(env, verifiedJob)
     return verifiedJob
+    
   } catch (error) {
     console.error(`❌ CRITICAL: Job creation failed in createJob function`)
     console.error(`❌ Error type:`, error?.constructor?.name || 'Unknown')
