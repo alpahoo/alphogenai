@@ -37,7 +37,7 @@ export const DashboardHeader = (props: {
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_, session) => {
         setUser(session?.user ?? null);
       },
     );
