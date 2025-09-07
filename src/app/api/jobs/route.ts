@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { Env } from '@/libs/Env';
 import { createServerSupabaseClient, createSupabaseAdmin } from '@/libs/supabase';
 
 export async function GET() {
@@ -59,6 +60,48 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (Env.RUNPOD_API_KEY && Env.RUNPOD_ENDPOINT_ID) {
+      try {
+        const webhookUrl = Env.NEXT_PUBLIC_BASE_URL
+          ? `${Env.NEXT_PUBLIC_BASE_URL}/api/webhooks/runpod`
+          : undefined;
+
+        const runpodResponse = await fetch(`https://api.runpod.ai/v2/${Env.RUNPOD_ENDPOINT_ID}/run`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Env.RUNPOD_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            input: {
+              prompt,
+              job_id: job.id,
+            },
+            ...(webhookUrl && { webhook: webhookUrl }),
+          }),
+        });
+
+        if (runpodResponse.ok) {
+          const runpodData = await runpodResponse.json();
+
+          const { error: updateError } = await createSupabaseAdmin()
+            .from('jobs')
+            .update({
+              status: 'running',
+              runpod_job_id: runpodData.id,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', job.id);
+
+          if (!updateError) {
+            job.status = 'running';
+            job.runpod_job_id = runpodData.id;
+          }
+        }
+      } catch {
+      }
     }
 
     return NextResponse.json({ job }, { status: 201 });

@@ -56,18 +56,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Apply Supabase Migration
+      - name: Apply Supabase Migrations
         run: |
-          MIGRATION_SQL=$(cat migrations/0001_jobs.sql)
-
           # Extract project ref from SUPABASE_URL (format: https://PROJECT_REF.supabase.co)
           PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://||' | sed 's|\.supabase\.co||')
-          # Use Supabase Management API to execute migration
+
+          # Apply 0001_jobs.sql migration
+          MIGRATION_SQL_1=$(cat migrations/0001_jobs.sql)
           curl -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d "{\"query\": $(echo "$MIGRATION_SQL" | jq -Rs .)}" \
-            --fail-with-body || echo "Migration execution completed with warnings"
+            -d "{\"query\": $(echo "$MIGRATION_SQL_1" | jq -Rs .)}" \
+            --fail-with-body || echo "Migration 0001 execution completed with warnings"
+
+          # Apply 0002_runpod.sql migration
+          MIGRATION_SQL_2=$(cat migrations/0002_runpod.sql)
+          curl -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\": $(echo "$MIGRATION_SQL_2" | jq -Rs .)}" \
+            --fail-with-body || echo "Migration 0002 execution completed with warnings"
 
   deploy:
     name: Deploy to Production
