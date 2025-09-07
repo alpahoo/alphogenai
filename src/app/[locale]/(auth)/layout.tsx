@@ -1,42 +1,48 @@
 'use client';
 
-import { enUS, frFR } from '@clerk/localizations';
-import { ClerkProvider } from '@clerk/nextjs';
+import { createContext, useContext, useEffect, useState } from 'react';
 
-import { AppConfig } from '@/utils/AppConfig';
+import { supabase } from '@/libs/supabase';
+
+const AuthContext = createContext<{
+  user: any;
+  loading: boolean;
+}>({
+  user: null,
+  loading: true,
+});
+
+export const useAuth = () => useContext(AuthContext);
 
 export default function AuthLayout(props: {
   children: React.ReactNode;
   params: { locale: string };
 }) {
-  let clerkLocale = enUS;
-  let signInUrl = '/sign-in';
-  let signUpUrl = '/sign-up';
-  let dashboardUrl = '/dashboard';
-  let afterSignOutUrl = '/';
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (props.params.locale === 'fr') {
-    clerkLocale = frFR;
-  }
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      setLoading(false);
+    };
 
-  if (props.params.locale !== AppConfig.defaultLocale) {
-    signInUrl = `/${props.params.locale}${signInUrl}`;
-    signUpUrl = `/${props.params.locale}${signUpUrl}`;
-    dashboardUrl = `/${props.params.locale}${dashboardUrl}`;
-    afterSignOutUrl = `/${props.params.locale}${afterSignOutUrl}`;
-  }
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+        setLoading(false);
+      },
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
-    <ClerkProvider
-      // PRO: Dark mode support for Clerk
-      localization={clerkLocale}
-      signInUrl={signInUrl}
-      signUpUrl={signUpUrl}
-      signInFallbackRedirectUrl={dashboardUrl}
-      signUpFallbackRedirectUrl={dashboardUrl}
-      afterSignOutUrl={afterSignOutUrl}
-    >
+    <AuthContext.Provider value={{ user, loading }}>
       {props.children}
-    </ClerkProvider>
+    </AuthContext.Provider>
   );
 }
