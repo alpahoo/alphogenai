@@ -3,6 +3,15 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "npm ci",
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@next_public_supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key",
+    "SUPABASE_SERVICE_ROLE": "@supabase_service_role",
+    "RUNPOD_API_KEY": "@runpod_api_key",
+    "RUNPOD_ENDPOINT_ID": "@runpod_endpoint_id",
+    "WEBHOOK_SECRET": "@webhook_secret",
+    "NEXT_PUBLIC_BASE_URL": "https://alphogenai.vercel.app"
+  },
   "functions": {
     "src/app/api/**/*.ts": {
       "maxDuration": 30
