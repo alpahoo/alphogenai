@@ -1,5 +1,7 @@
 # Free and Open Source SaaS Boilerplate with Tailwind CSS and Shadcn UI
 
+<!-- AlphoGenAI: Trigger deployment with updated environment variables -->
+
 <p align="center">
   <a href="https://react-saas.com"><img height="300" src="public/assets/images/nextjs-starter-banner.png?raw=true" alt="Next.js SaaS Template"></a>
 </p>
