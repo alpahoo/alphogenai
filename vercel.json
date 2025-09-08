@@ -10,7 +10,7 @@
     "RUNPOD_API_KEY": "@runpod_api_key",
     "RUNPOD_ENDPOINT_ID": "@runpod_endpoint_id",
     "WEBHOOK_SECRET": "@webhook_secret",
-    "NEXT_PUBLIC_BASE_URL": "@next_public_base_url"
+    "NEXT_PUBLIC_BASE_URL": "https://alphogenai.vercel.app"
   },
   "functions": {
     "src/app/api/**/*.ts": {
