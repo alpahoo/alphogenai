@@ -4,8 +4,8 @@
   "framework": "nextjs",
   "installCommand": "npm ci",
   "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "@next_public_supabase_url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key",
+    "NEXT_PUBLIC_SUPABASE_URL": "https://abpbvhycqgvgpjvficff.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFicGJ2aHljcWd2Z3BqdmZpY2ZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4NTgwMzgsImV4cCI6MjA3MjQzNDAzOH0.JBOlFZczD-s-zuZgji5nPZPVD72hpZCezA8tOcdTkwM",
     "SUPABASE_SERVICE_ROLE": "@supabase_service_role",
     "RUNPOD_API_KEY": "@runpod_api_key",
     "RUNPOD_ENDPOINT_ID": "@runpod_endpoint_id",
