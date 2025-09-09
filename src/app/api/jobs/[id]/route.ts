@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
-    const { user, error: authError } = await validateBearerToken(
+    const { data: { user }, error: authError } = await validateBearerToken(
       request.headers.get('authorization'),
     );
 

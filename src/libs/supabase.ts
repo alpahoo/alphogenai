@@ -40,12 +40,11 @@ export const createSupabaseAdmin = () => {
 
 export const validateBearerToken = async (authHeader: string | null) => {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { user: null, error: 'Missing or invalid Authorization header' };
+    return { data: { user: null }, error: { message: 'Missing or invalid Authorization header' } };
   }
 
   const token = authHeader.substring(7);
   const supabaseAdmin = createSupabaseAdmin();
 
-  const { data, error } = await supabaseAdmin.auth.getUser(token);
-  return { user: data.user, error };
+  return await supabaseAdmin.auth.getUser(token);
 };
