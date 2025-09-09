@@ -1,7 +1,7 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { Env } from '@/libs/Env';
 
@@ -24,27 +24,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     Env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
   ), []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
       setUser(null);
     } catch (error) {
       console.error('Sign out error:', error);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     let mounted = true;
 
     const getUser = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error) {
+          if (mounted) {
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+
         if (mounted) {
           setUser(user);
           setLoading(false);
         }
-      } catch (error) {
-        console.error('Get user error:', error);
+      } catch {
         if (mounted) {
           setUser(null);
           setLoading(false);
@@ -55,7 +63,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_, session) => {
+      (event, session) => {
         if (mounted) {
           setUser(session?.user ?? null);
           setLoading(false);
@@ -73,7 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user,
     loading,
     signOut,
-  }), [user, loading]);
+  }), [user, loading, signOut]);
 
   return (
     <AuthContext.Provider value={contextValue}>

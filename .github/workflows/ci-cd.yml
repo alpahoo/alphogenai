@@ -77,6 +77,14 @@ jobs:
             -d "{\"query\": $(echo "$MIGRATION_SQL_2" | jq -Rs .)}" \
             --fail-with-body || echo "Migration 0002 execution completed with warnings"
 
+          # Apply 0003_add_progress_to_jobs.sql migration
+          MIGRATION_SQL_3=$(cat migrations/0003_add_progress_to_jobs.sql)
+          curl -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\": $(echo "$MIGRATION_SQL_3" | jq -Rs .)}" \
+            --fail-with-body || echo "Migration 0003 execution completed with warnings"
+
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
