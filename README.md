@@ -2,6 +2,7 @@
 
 <!-- AlphoGenAI: Trigger deployment with updated Vercel project configuration -->
 <!-- Production URL: https://alphogenai.vercel.app -->
+<!-- Force fresh deployment: 2025-09-09 23:29:26 UTC - AuthContext fixes from PR #42 -->
 
 <p align="center">
   <a href="https://react-saas.com"><img height="300" src="public/assets/images/nextjs-starter-banner.png?raw=true" alt="Next.js SaaS Template"></a>
