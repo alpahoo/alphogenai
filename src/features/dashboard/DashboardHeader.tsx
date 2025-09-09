@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { useEffect, useState } from 'react';
 
 import { ActiveLink } from '@/components/ActiveLink';
 import { LocaleSwitcher } from '@/components/LocaleSwitcher';
@@ -15,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
-import { supabase } from '@/libs/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { Logo } from '@/templates/Logo';
 
 export const DashboardHeader = (props: {
@@ -26,27 +25,10 @@ export const DashboardHeader = (props: {
 }) => {
   const locale = useLocale();
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-    };
-
-    getUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_, session) => {
-        setUser(session?.user ?? null);
-      },
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     router.push(`/${locale}/sign-in`);
   };
 
