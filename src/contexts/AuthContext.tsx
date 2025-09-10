@@ -1,8 +1,9 @@
 'use client';
 
+import { createBrowserClient } from '@supabase/ssr';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-import { supabase } from '@/libs/supabase';
+import { Env } from '@/libs/Env';
 
 const AuthContext = createContext<{
   user: any;
@@ -18,29 +19,68 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const supabase = useMemo(() => createBrowserClient(
+    Env.NEXT_PUBLIC_SUPABASE_URL || '',
+    Env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  ), []);
+
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
   };
 
   useEffect(() => {
+    let mounted = true;
+
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setLoading(false);
+      try {
+        console.log('AuthContext: Getting user...'); // eslint-disable-line no-console
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error) {
+          console.error('AuthContext: Get user error:', error); // eslint-disable-line no-console
+          if (mounted) {
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        console.log('AuthContext: User retrieved:', user ? 'authenticated' : 'not authenticated'); // eslint-disable-line no-console
+        if (mounted) {
+          setUser(user);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('AuthContext: Get user exception:', error); // eslint-disable-line no-console
+        if (mounted) {
+          setUser(null);
+          setLoading(false);
+        }
+      }
     };
 
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_, session) => {
-        setUser(session?.user ?? null);
-        setLoading(false);
+      (event, session) => {
+        console.log('AuthContext: Auth state change:', event, session ? 'session exists' : 'no session'); // eslint-disable-line no-console
+        if (mounted) {
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
       },
     );
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   const contextValue = useMemo(() => ({
     user,

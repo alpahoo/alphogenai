@@ -2,18 +2,19 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { Env } from '@/libs/Env';
-import { createServerSupabaseClient, createSupabaseAdmin } from '@/libs/supabase';
+import { createSupabaseAdmin, validateBearerToken } from '@/libs/supabase';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await validateBearerToken(
+      request.headers.get('authorization'),
+    );
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const supabase = createSupabaseAdmin();
     const { data: jobs, error } = await supabase
       .from('jobs')
       .select('*')
@@ -33,9 +34,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await validateBearerToken(
+      request.headers.get('authorization'),
+    );
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -7,6 +7,7 @@ import { createSupabaseAdmin } from '@/libs/supabase';
 export async function POST(request: NextRequest) {
   try {
     const webhookSecret = request.headers.get('x-webhook-secret');
+
     if (Env.WEBHOOK_SECRET && webhookSecret !== Env.WEBHOOK_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -37,3 +37,14 @@ export const createSupabaseAdmin = () => {
     Env.SUPABASE_SERVICE_ROLE || '',
   );
 };
+
+export const validateBearerToken = async (authHeader: string | null) => {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { data: { user: null }, error: { message: 'Missing or invalid Authorization header' } };
+  }
+
+  const token = authHeader.substring(7);
+  const supabaseAdmin = createSupabaseAdmin();
+
+  return await supabaseAdmin.auth.getUser(token);
+};

@@ -85,5 +85,5 @@ export default async function middleware(
 }
 
 export const config = {
-  matcher: ['/((?!.+\\.[\\w]+$|_next|monitoring).*)', '/', '/(api|trpc)(.*)'], // Also exclude tunnelRoute used in Sentry from the matcher
+  matcher: ['/((?!.+\\.[\\w]+$|_next|monitoring|api|trpc).*)', '/'], // Exclude API routes, tunnelRoute used in Sentry, and other static assets
 };
