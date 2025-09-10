@@ -38,9 +38,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const getUser = async () => {
       try {
+        console.log('AuthContext: Getting user...'); // eslint-disable-line no-console
         const { data: { user }, error } = await supabase.auth.getUser();
 
         if (error) {
+          console.error('AuthContext: Get user error:', error); // eslint-disable-line no-console
           if (mounted) {
             setUser(null);
             setLoading(false);
@@ -48,11 +50,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
+        console.log('AuthContext: User retrieved:', user ? 'authenticated' : 'not authenticated'); // eslint-disable-line no-console
         if (mounted) {
           setUser(user);
           setLoading(false);
         }
-      } catch {
+      } catch (error) {
+        console.error('AuthContext: Get user exception:', error); // eslint-disable-line no-console
         if (mounted) {
           setUser(null);
           setLoading(false);
@@ -63,7 +67,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        console.log('AuthContext: Auth state change:', event, session ? 'session exists' : 'no session'); // eslint-disable-line no-console
         if (mounted) {
           setUser(session?.user ?? null);
           setLoading(false);
