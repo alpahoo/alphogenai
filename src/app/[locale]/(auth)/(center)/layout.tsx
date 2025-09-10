@@ -11,11 +11,16 @@ export default function CenteredLayout(props: { children: React.ReactNode }) {
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
 
-      if (user) {
-        router.push('/dashboard');
-      } else {
+        if (user) {
+          router.push('/dashboard');
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth layout: Error checking user:', error);
         setLoading(false);
       }
     };
