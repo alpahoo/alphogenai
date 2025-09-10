@@ -60,6 +60,8 @@ jobs:
         run: |
           # Extract project ref from SUPABASE_URL (format: https://PROJECT_REF.supabase.co)
           PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://||' | sed 's|\.supabase\.co||')
+          echo "Extracted PROJECT_REF: $PROJECT_REF"
+          echo "Full migration URL will be: https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query"
 
           # Apply 0001_jobs.sql migration
           MIGRATION_SQL_1=$(cat migrations/0001_jobs.sql)
@@ -132,6 +134,7 @@ jobs:
 
           # Extract project ref from SUPABASE_URL
           PROJECT_REF=$(echo "${{ secrets.SUPABASE_URL }}" | sed 's|https://||' | sed 's|\.supabase\.co||')
+          echo "Extracted PROJECT_REF for verification: $PROJECT_REF"
 
           # Test that jobs table exists and has correct structure
           SCHEMA_CHECK=$(curl -s -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
