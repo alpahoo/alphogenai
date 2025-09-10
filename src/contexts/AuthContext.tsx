@@ -1,11 +1,11 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Env } from '@/libs/Env';
 
-const AuthContext = createContext<{
+export const AuthContext = createContext<{
   user: any;
   loading: boolean;
   signOut: () => Promise<void>;
@@ -40,9 +40,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         console.log('AuthContext: Getting user...'); // eslint-disable-line no-console
         const { data: { user }, error } = await supabase.auth.getUser();
-
         if (error) {
-          console.error('AuthContext: Get user error:', error); // eslint-disable-line no-console
+          console.error('AuthContext: Get user error:', error);
           if (mounted) {
             setUser(null);
             setLoading(false);
@@ -56,7 +55,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setLoading(false);
         }
       } catch (error) {
-        console.error('AuthContext: Get user exception:', error); // eslint-disable-line no-console
+        console.error('AuthContext: Get user exception:', error);
         if (mounted) {
           setUser(null);
           setLoading(false);
@@ -94,5 +93,3 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);
