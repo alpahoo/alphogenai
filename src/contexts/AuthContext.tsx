@@ -1,7 +1,7 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 import { Env } from '@/libs/Env';
 
@@ -24,14 +24,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     Env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
   ), []);
 
-  const signOut = useCallback(async () => {
+  const signOut = async () => {
     try {
       await supabase.auth.signOut();
       setUser(null);
     } catch (error) {
       console.error('Sign out error:', error);
     }
-  }, [supabase]);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         console.log('AuthContext: Getting user...'); // eslint-disable-line no-console
         const { data: { user }, error } = await supabase.auth.getUser();
-
+        
         if (error) {
           console.error('AuthContext: Get user error:', error); // eslint-disable-line no-console
           if (mounted) {
@@ -86,7 +86,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user,
     loading,
     signOut,
-  }), [user, loading, signOut]);
+  }), [user, loading]);
 
   return (
     <AuthContext.Provider value={contextValue}>
