@@ -8,8 +8,17 @@ export async function POST(request: NextRequest) {
   try {
     const webhookSecret = request.headers.get('x-webhook-secret');
 
+    console.log('Webhook Debug - Env.WEBHOOK_SECRET:', Env.WEBHOOK_SECRET ? 'SET' : 'NOT SET');
+    console.log('Webhook Debug - Received secret:', webhookSecret ? 'PROVIDED' : 'NOT PROVIDED');
+    console.log('Webhook Debug - Secrets match:', webhookSecret === Env.WEBHOOK_SECRET);
+
     if (Env.WEBHOOK_SECRET && webhookSecret !== Env.WEBHOOK_SECRET) {
+      console.log('Webhook Debug - Rejecting due to secret mismatch');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!Env.WEBHOOK_SECRET) {
+      console.log('Webhook Debug - No WEBHOOK_SECRET configured, allowing request');
     }
 
     const payload = await request.json();
