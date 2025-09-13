@@ -2,17 +2,17 @@ name: CI/CD Pipeline
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - '.github/ISSUE_TEMPLATE/**'
+      - README.md
+      - docs/**
+      - .github/ISSUE_TEMPLATE/**
   push:
-    branches: [ main ]
+    branches: [main]
     paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - '.github/ISSUE_TEMPLATE/**'
+      - README.md
+      - docs/**
+      - .github/ISSUE_TEMPLATE/**
   workflow_dispatch:
   release:
     types: [published]
