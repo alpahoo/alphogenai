@@ -134,6 +134,9 @@
       "path": "@commitlint/cz-commitlint"
     }
   },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": "eslint --fix"
+  },
   "release": {
     "branches": [
       "main"

@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { createSupabaseAdmin } from '@/libs/supabase-server';
 import { validateBearerToken } from '@/libs/supabase-auth.server';
+import { createSupabaseAdmin } from '@/libs/supabase-server';
 
 export async function GET(
   request: NextRequest,
