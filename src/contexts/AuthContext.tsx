@@ -1,9 +1,9 @@
 'use client';
 
-import { createBrowserClient } from '@supabase/ssr';
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Env } from '@/libs/Env';
+import { ENV } from '@/libs/Env';
+import { createSupabaseBrowser } from '@/libs/supabase';
 
 export const AuthContext = createContext<{
   user: any;
@@ -19,12 +19,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const supabase = useMemo(() => createBrowserClient(
-    Env.NEXT_PUBLIC_SUPABASE_URL || '',
-    Env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  ), []);
+  const supabase = useMemo(() => {
+    if (!ENV.SUPABASE_URL || !ENV.SUPABASE_ANON_KEY) {
+      console.error('AuthContext: Missing Supabase configuration');
+      return null;
+    }
+    return createSupabaseBrowser();
+  }, []);
 
   const signOut = useCallback(async () => {
+    if (!supabase) {
+      console.error('AuthContext: Cannot sign out, Supabase client not available');
+      return;
+    }
     try {
       await supabase.auth.signOut();
       setUser(null);
@@ -36,12 +43,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let mounted = true;
 
+    if (!supabase) {
+      console.error('AuthContext: Supabase client not available');
+      if (mounted) {
+        setUser(null);
+        setLoading(false);
+      }
+      return;
+    }
+
     const getUser = async () => {
       try {
         console.log('AuthContext: Getting user...'); // eslint-disable-line no-console
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) {
           console.error('AuthContext: Get user error:', error);
+          console.error('AuthContext: Supabase URL:', ENV.SUPABASE_URL ? 'SET' : 'NOT SET');
+          console.error('AuthContext: Supabase Anon Key:', ENV.SUPABASE_ANON_KEY ? 'SET' : 'NOT SET');
           if (mounted) {
             setUser(null);
             setLoading(false);

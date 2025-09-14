@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 export const Env = createEnv({
   server: {
-    SUPABASE_SERVICE_ROLE: z.string().optional(),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
     DATABASE_URL: z.string().optional(),
     LOGTAIL_SOURCE_TOKEN: z.string().optional(),
     STRIPE_SECRET_KEY: z.string().optional(),
@@ -27,7 +27,7 @@ export const Env = createEnv({
     NODE_ENV: z.enum(['test', 'development', 'production']).optional(),
   },
   runtimeEnv: {
-    SUPABASE_SERVICE_ROLE: process.env.SUPABASE_SERVICE_ROLE,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     DATABASE_URL: process.env.DATABASE_URL,
     LOGTAIL_SOURCE_TOKEN: process.env.LOGTAIL_SOURCE_TOKEN,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
@@ -48,3 +48,15 @@ export const Env = createEnv({
   },
   skipValidation: process.env.NODE_ENV === 'development',
 });
+
+export const ENV = {
+  SUPABASE_URL: Env.NEXT_PUBLIC_SUPABASE_URL,
+  SUPABASE_ANON_KEY: Env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  SUPABASE_SERVICE_ROLE_KEY: Env.SUPABASE_SERVICE_ROLE_KEY,
+  WEBHOOK_SECRET: Env.WEBHOOK_SECRET,
+  RUNPOD_API_KEY: Env.RUNPOD_API_KEY,
+  RUNPOD_ENDPOINT_ID: Env.RUNPOD_ENDPOINT_ID,
+  APP_URL: Env.NEXT_PUBLIC_APP_URL,
+  SITE_URL: Env.NEXT_PUBLIC_SITE_URL,
+  BASE_URL: Env.NEXT_PUBLIC_BASE_URL,
+};
