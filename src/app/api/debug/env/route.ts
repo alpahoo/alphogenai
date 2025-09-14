@@ -11,6 +11,7 @@ export async function GET() {
       WEBHOOK_SECRET: !!ENV.WEBHOOK_SECRET,
       NODE_ENV: process.env.NODE_ENV,
       timestamp: new Date().toISOString(),
+      deployment_trigger: 'force-redeploy-v2',
     };
 
     return NextResponse.json(envCheck);
