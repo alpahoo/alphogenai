@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { TitleBar } from '@/features/dashboard/TitleBar';
-import { supabase } from '@/libs/supabase';
+import { createSupabaseBrowser } from '@/libs/supabase-browser';
 
 const UserProfilePage = (props: { params: { locale: string } }) => {
   const router = useRouter();
@@ -15,7 +15,7 @@ const UserProfilePage = (props: { params: { locale: string } }) => {
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await createSupabaseBrowser().auth.getUser();
       setUser(user);
       setLoading(false);
     };
@@ -24,7 +24,7 @@ const UserProfilePage = (props: { params: { locale: string } }) => {
   }, []);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await createSupabaseBrowser().auth.signOut();
     router.push(`/${props.params.locale}/sign-in`);
   };
 
@@ -36,7 +36,7 @@ const UserProfilePage = (props: { params: { locale: string } }) => {
     const formData = new FormData(e.currentTarget);
     const newPassword = formData.get('password') as string;
 
-    const { error } = await supabase.auth.updateUser({
+    const { error } = await createSupabaseBrowser().auth.updateUser({
       password: newPassword,
     });
 

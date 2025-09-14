@@ -3,7 +3,7 @@
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ENV } from '@/libs/Env';
-import { createSupabaseBrowser } from '@/libs/supabase';
+import { createSupabaseBrowser } from '@/libs/supabase-browser';
 
 export const AuthContext = createContext<{
   user: any;

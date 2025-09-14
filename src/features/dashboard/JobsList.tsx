@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/libs/supabase';
+import { createSupabaseBrowser } from '@/libs/supabase-browser';
 
 type Job = {
   id: string;
@@ -24,7 +24,7 @@ export const JobsList = () => {
 
   const fetchJobs = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await createSupabaseBrowser().auth.getSession();
       const response = await fetch('/api/jobs', {
         headers: {
           Authorization: `Bearer ${session?.access_token}`,
@@ -49,7 +49,7 @@ export const JobsList = () => {
 
     setCreating(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await createSupabaseBrowser().auth.getSession();
       const response = await fetch('/api/jobs', {
         method: 'POST',
         headers: {

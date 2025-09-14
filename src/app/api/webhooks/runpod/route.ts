@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { Env } from '@/libs/Env';
-import { createSupabaseAdmin } from '@/libs/supabase';
+import { createSupabaseAdmin } from '@/libs/supabase-server';
 
 export async function POST(request: NextRequest) {
   try {

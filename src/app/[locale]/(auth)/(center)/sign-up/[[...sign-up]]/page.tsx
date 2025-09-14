@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { supabase } from '@/libs/supabase';
+import { createSupabaseBrowser } from '@/libs/supabase-browser';
 
 const SignUpPage = (props: { params: { locale: string } }) => {
   const [email, setEmail] = useState('');
@@ -26,7 +26,7 @@ const SignUpPage = (props: { params: { locale: string } }) => {
       return;
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { error } = await createSupabaseBrowser().auth.signUp({
       email,
       password,
     });
