@@ -10,6 +10,9 @@ create table if not exists public.jobs (
   updated_at timestamptz not null default now()
 );
 
+ALTER TABLE public.jobs
+ADD COLUMN IF NOT EXISTS progress integer DEFAULT 0 NOT NULL;
+
 alter table public.jobs enable row level security;
 
 create policy "Users can view their own jobs"
