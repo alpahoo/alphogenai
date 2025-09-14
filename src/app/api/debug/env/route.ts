@@ -1,0 +1,15 @@
+import { NextResponse } from 'next/server';
+
+import { Env } from '@/libs/Env';
+
+export async function GET() {
+  return NextResponse.json({
+    NEXT_PUBLIC_SUPABASE_URL: !!Env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: !!Env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    SUPABASE_SERVICE_ROLE_KEY: !!Env.SUPABASE_SERVICE_ROLE_KEY,
+    WEBHOOK_SECRET: !!Env.WEBHOOK_SECRET,
+    RUNPOD_API_KEY: !!Env.RUNPOD_API_KEY,
+    RUNPOD_ENDPOINT_ID: !!Env.RUNPOD_ENDPOINT_ID,
+    NEXT_PUBLIC_BASE_URL: !!Env.NEXT_PUBLIC_BASE_URL,
+  });
+}
