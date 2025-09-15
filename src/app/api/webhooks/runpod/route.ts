@@ -1,14 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { Env } from '@/libs/Env';
+import { ENV_SERVER } from '@/libs/Env';
 import { createSupabaseAdmin } from '@/libs/supabase-server';
 
 export async function POST(request: NextRequest) {
   try {
     const webhookSecret = request.headers.get('x-webhook-secret');
 
-    if (Env.WEBHOOK_SECRET && webhookSecret !== Env.WEBHOOK_SECRET) {
+    if (ENV_SERVER.WEBHOOK_SECRET && webhookSecret !== ENV_SERVER.WEBHOOK_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

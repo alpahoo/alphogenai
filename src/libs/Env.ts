@@ -49,14 +49,19 @@ export const Env = createEnv({
   skipValidation: process.env.NODE_ENV === 'development',
 });
 
-export const ENV = {
+export const ENV_CLIENT = {
   SUPABASE_URL: Env.NEXT_PUBLIC_SUPABASE_URL,
   SUPABASE_ANON_KEY: Env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  APP_URL: Env.NEXT_PUBLIC_APP_URL || 'https://app.alphogen.com',
+  SITE_URL: Env.NEXT_PUBLIC_SITE_URL || 'https://app.alphogen.com',
+  BASE_URL: Env.NEXT_PUBLIC_BASE_URL || 'https://app.alphogen.com',
+};
+
+export const ENV_SERVER = {
   SUPABASE_SERVICE_ROLE_KEY: Env.SUPABASE_SERVICE_ROLE_KEY,
   WEBHOOK_SECRET: Env.WEBHOOK_SECRET,
   RUNPOD_API_KEY: Env.RUNPOD_API_KEY,
   RUNPOD_ENDPOINT_ID: Env.RUNPOD_ENDPOINT_ID,
-  APP_URL: Env.NEXT_PUBLIC_APP_URL,
-  SITE_URL: Env.NEXT_PUBLIC_SITE_URL,
-  BASE_URL: Env.NEXT_PUBLIC_BASE_URL,
+  DATABASE_URL: Env.DATABASE_URL,
+  LOGTAIL_SOURCE_TOKEN: Env.LOGTAIL_SOURCE_TOKEN,
 };
