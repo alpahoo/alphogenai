@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const PROD_URL = 'https://alphogenai.vercel.app';
+const PROD_URL = 'https://app.alphogen.com';
 const TEST_EMAIL = 'qa-user@mailinator.com';
 const TEST_PASSWORD = 'Test1234!';
 

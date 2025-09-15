@@ -91,7 +91,7 @@ jobs:
       - run: npm ci
       - name: Smoke test (auth + jobs + health)
         env:
-          PROD_URL: https://alphogenai.vercel.app
+          PROD_URL: https://app.alphogen.com
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
