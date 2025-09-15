@@ -2,14 +2,14 @@ import logtail from '@logtail/pino';
 import pino, { type DestinationStream } from 'pino';
 import pretty from 'pino-pretty';
 
-import { Env } from './Env';
+import { ENV_SERVER } from './Env';
 
 let stream: DestinationStream;
 
-if (Env.LOGTAIL_SOURCE_TOKEN) {
+if (ENV_SERVER.LOGTAIL_SOURCE_TOKEN) {
   stream = pino.multistream([
     await logtail({
-      sourceToken: Env.LOGTAIL_SOURCE_TOKEN,
+      sourceToken: ENV_SERVER.LOGTAIL_SOURCE_TOKEN,
       options: {
         sendLogsToBetterStack: true,
       },
