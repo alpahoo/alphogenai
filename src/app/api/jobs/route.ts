@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { Env, ENV_SERVER } from '@/libs/Env';
+import { ENV_CLIENT, ENV_SERVER } from '@/libs/Env';
 import { validateBearerToken } from '@/libs/supabase-auth.server';
 import { createSupabaseAdmin } from '@/libs/supabase-server';
 
@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
 
     if (ENV_SERVER.RUNPOD_API_KEY && ENV_SERVER.RUNPOD_ENDPOINT_ID) {
       try {
-        const webhookUrl = Env.NEXT_PUBLIC_BASE_URL
-          ? `${Env.NEXT_PUBLIC_BASE_URL}/api/webhooks/runpod`
+        const webhookUrl = ENV_CLIENT.BASE_URL
+          ? `${ENV_CLIENT.BASE_URL}/api/webhooks/runpod`
           : undefined;
 
         const runpodResponse = await fetch(`https://api.runpod.ai/v2/${ENV_SERVER.RUNPOD_ENDPOINT_ID}/run`, {
