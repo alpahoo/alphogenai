@@ -65,16 +65,15 @@ jobs:
       - name: Apply Supabase migrations via Management API
         shell: bash
         env:
-          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           set -euo pipefail
-          PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://||' | sed 's|\.supabase\.co||')
-          SQL=$(cat migrations/0001_jobs.sql)
-          curl -sS -X POST "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query" \
+          curl -sS -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query" \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "apikey: ${SUPABASE_ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "{\"query\": $(printf '%s' "$SQL" | jq -Rs .)}" \
+            -d '{"query":"alter table public.jobs add column if not exists progress integer default 0 not null;"}' \
             --fail-with-body
 
   e2e-smoke:

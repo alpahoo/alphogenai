@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ENV } from '@/libs/Env';
+import { ENV_CLIENT } from '@/libs/Env';
 import { createSupabaseBrowser } from '@/libs/supabase-browser';
 
 export const AuthContext = createContext<{
@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const supabase = useMemo(() => {
-    if (!ENV.SUPABASE_URL || !ENV.SUPABASE_ANON_KEY) {
+    if (!ENV_CLIENT.SUPABASE_URL || !ENV_CLIENT.SUPABASE_ANON_KEY) {
       console.error('AuthContext: Missing Supabase configuration');
       return null;
     }
@@ -58,8 +58,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) {
           console.error('AuthContext: Get user error:', error);
-          console.error('AuthContext: Supabase URL:', ENV.SUPABASE_URL ? 'SET' : 'NOT SET');
-          console.error('AuthContext: Supabase Anon Key:', ENV.SUPABASE_ANON_KEY ? 'SET' : 'NOT SET');
+          console.error('AuthContext: Supabase URL:', ENV_CLIENT.SUPABASE_URL ? 'SET' : 'NOT SET');
+          console.error('AuthContext: Supabase Anon Key:', ENV_CLIENT.SUPABASE_ANON_KEY ? 'SET' : 'NOT SET');
           if (mounted) {
             setUser(null);
             setLoading(false);

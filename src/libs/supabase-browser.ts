@@ -1,13 +1,13 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-import { ENV } from './Env';
+import { ENV_CLIENT } from './Env';
 
 export function createSupabaseBrowser() {
-  if (!ENV.SUPABASE_URL || !ENV.SUPABASE_ANON_KEY) {
+  if (!ENV_CLIENT.SUPABASE_URL || !ENV_CLIENT.SUPABASE_ANON_KEY) {
     throw new Error('Missing Supabase configuration for browser client');
   }
   return createBrowserClient(
-    ENV.SUPABASE_URL,
-    ENV.SUPABASE_ANON_KEY,
+    ENV_CLIENT.SUPABASE_URL,
+    ENV_CLIENT.SUPABASE_ANON_KEY,
   );
 }
