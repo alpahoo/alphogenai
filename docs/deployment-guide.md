@@ -11,7 +11,7 @@ Configure these in Vercel Dashboard > Project Settings > Environment Variables:
 - `RUNPOD_API_KEY`: [Runpod API key]
 - `RUNPOD_ENDPOINT_ID`: [Runpod endpoint ID]
 - `WEBHOOK_SECRET`: [Webhook secret for Runpod]
-- `NEXT_PUBLIC_BASE_URL`: https://alphogenai.vercel.app
+- `NEXT_PUBLIC_BASE_URL`: https://app.alphogen.com
 
 ### GitHub Actions Secrets
 Configure these in GitHub Repository Settings > Secrets and Variables > Actions:
@@ -28,7 +28,7 @@ Configure these in GitHub Repository Settings > Secrets and Variables > Actions:
 - `WEBHOOK_SECRET`: [Webhook secret for Runpod]
 
 ## Webhook Configuration
-Configure Runpod webhook URL: https://alphogenai.vercel.app/api/webhooks/runpod
+Configure Runpod webhook URL: https://app.alphogen.com/api/webhooks/runpod
 
 ## Test User
 Stable test user for E2E testing: qa-user@mailinator.com / Test1234!
@@ -57,13 +57,13 @@ curl -X POST "https://abpbvhycqgvgpjvficff.supabase.co/auth/v1/token?grant_type=
   -d '{"email":"qa-user@mailinator.com","password":"Test1234!"}'
 
 # Test job creation
-curl -X POST "https://alphogenai.vercel.app/api/jobs" \
+curl -X POST "https://app.alphogen.com/api/jobs" \
   -H "Authorization: Bearer [ACCESS_TOKEN]" \
   -H "Content-Type: application/json" \
   -d '{"prompt":"Test video generation"}'
 
 # Test webhook
-curl -X POST "https://alphogenai.vercel.app/api/webhooks/runpod" \
+curl -X POST "https://app.alphogen.com/api/webhooks/runpod" \
   -H "Content-Type: application/json" \
   -H "x-webhook-secret: [WEBHOOK_SECRET]" \
   -d '{"id":"[JOB_ID]","status":"COMPLETED","output":{"result_url":"https://example.com/result.mp4"}}'

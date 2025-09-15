@@ -10,7 +10,7 @@ on:
       production_url:
         description: Production URL to test
         required: true
-        default: 'https://alphogenai.vercel.app'
+        default: 'https://app.alphogen.com'
 
 jobs:
   e2e_production_test:
@@ -26,7 +26,7 @@ jobs:
         run: |
           echo "Testing complete production user flow..."
 
-          PRODUCTION_URL="${{ github.event.inputs.production_url || 'https://alphogenai.vercel.app' }}"
+          PRODUCTION_URL="${{ github.event.inputs.production_url || 'https://app.alphogen.com' }}"
           echo "Testing against: $PRODUCTION_URL"
 
           # Test stable user signup/login

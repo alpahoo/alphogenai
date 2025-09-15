@@ -1,7 +1,7 @@
 # Free and Open Source SaaS Boilerplate with Tailwind CSS and Shadcn UI
 
 <!-- AlphoGenAI: Trigger deployment with updated Vercel project configuration -->
-<!-- Production URL: https://alphogenai.vercel.app -->
+<!-- Production URL: https://app.alphogen.com -->
 
 <p align="center">
   <a href="https://react-saas.com"><img height="300" src="public/assets/images/nextjs-starter-banner.png?raw=true" alt="Next.js SaaS Template"></a>
@@ -602,7 +602,7 @@ Looking for a custom boilerplate to kick off your project? I'd be glad to discus
 
 [![Sponsor Next JS Boilerplate](https://cdn.buymeacoffee.com/buttons/default-red.png)](https://github.com/sponsors/ixartz)
 # Testing Vercel deployment with updated secrets
-# Production URL: https://alphogenai.vercel.app
+# Production URL: https://app.alphogen.com
 # Deployment trigger: Force fresh deployment to resolve API routing issues (1757343529)
 # Deployment trigger at Mon Sep  8 15:29:11 UTC 2025
 # Deployment trigger Tue Sep  9 14:41:15 UTC 2025
