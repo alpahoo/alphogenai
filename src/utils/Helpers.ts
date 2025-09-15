@@ -1,6 +1,8 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+import { ENV_CLIENT } from '@/libs/Env';
+
 import { AppConfig } from './AppConfig';
 
 export function cn(...inputs: ClassValue[]) {
@@ -14,16 +16,16 @@ export const getBaseUrl = () => {
     return window.location.origin;
   }
 
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL;
+  if (ENV_CLIENT.SITE_URL) {
+    return ENV_CLIENT.SITE_URL;
   }
 
-  if (process.env.NEXT_PUBLIC_BASE_URL) {
-    return process.env.NEXT_PUBLIC_BASE_URL;
+  if (ENV_CLIENT.BASE_URL) {
+    return ENV_CLIENT.BASE_URL;
   }
 
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL;
+  if (ENV_CLIENT.APP_URL) {
+    return ENV_CLIENT.APP_URL;
   }
 
   return 'http://localhost:3000';

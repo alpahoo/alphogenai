@@ -6,7 +6,7 @@ import {
 } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
 
-import { ENV } from './libs/Env';
+import { ENV_CLIENT } from './libs/Env';
 import { AllLocales, AppConfig } from './utils/AppConfig';
 
 const intlMiddleware = createMiddleware({
@@ -36,8 +36,8 @@ export default async function middleware(
     });
 
     const supabase = createServerClient(
-      ENV.SUPABASE_URL || '',
-      ENV.SUPABASE_ANON_KEY || '',
+      ENV_CLIENT.SUPABASE_URL || '',
+      ENV_CLIENT.SUPABASE_ANON_KEY || '',
       {
         cookies: {
           get(name: string) {
