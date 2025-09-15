@@ -52,9 +52,9 @@ export const Env = createEnv({
 export const ENV_CLIENT = {
   SUPABASE_URL: Env.NEXT_PUBLIC_SUPABASE_URL,
   SUPABASE_ANON_KEY: Env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  APP_URL: Env.NEXT_PUBLIC_APP_URL,
-  SITE_URL: Env.NEXT_PUBLIC_SITE_URL,
-  BASE_URL: Env.NEXT_PUBLIC_BASE_URL,
+  APP_URL: Env.NEXT_PUBLIC_APP_URL || 'https://app.alphogen.com',
+  SITE_URL: Env.NEXT_PUBLIC_SITE_URL || 'https://app.alphogen.com',
+  BASE_URL: Env.NEXT_PUBLIC_BASE_URL || 'https://app.alphogen.com',
 };
 
 export const ENV_SERVER = {
