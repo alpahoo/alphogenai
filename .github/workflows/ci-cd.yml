@@ -70,16 +70,36 @@ jobs:
         run: |
           set -euo pipefail
           SUPABASE_PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://||' | sed 's|\.supabase\.co||')
-          SQL=$(cat migrations/0001_jobs.sql)
+          SQL=$(cat migrations/0002_jobs_progress_and_constraints.sql)
           curl -sS -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query" \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
             -d "{\"query\": $(printf '%s' "$SQL" | jq -Rs .)}" \
             --fail-with-body
 
+  admin-setup:
+    name: Setup Admin User (main)
+    needs: migrations
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Create admin user
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ADMIN_BOOT_PWD: ${{ secrets.ADMIN_BOOT_PWD }}
+        run: node scripts/create-admin-user.js
+
   e2e-smoke:
     name: E2E Smoke (main)
-    needs: migrations
+    needs: admin-setup
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -90,45 +110,29 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: Smoke test (auth + jobs + health)
+      - name: Run comprehensive E2E test
         env:
-          PROD_URL: https://alphogenai.vercel.app
-          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          ADMIN_BOOT_PWD: ${{ secrets.ADMIN_BOOT_PWD }}
+        run: node scripts/e2e-production-test.js
+
+  deploy-production:
+    name: Deploy Production (main)
+    needs: e2e-smoke
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Vercel with cache clear
         run: |
-          set -euo pipefail
-          echo "Testing against: $PROD_URL"
-          # Signup (idempotent)
-          curl -s -X POST "$SUPABASE_URL/auth/v1/signup" \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{"email":"qa-user@mailinator.com","password":"Test1234!"}' >/dev/null || true
-          # Login
-          LOGIN=$(curl -s -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password" \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{"email":"qa-user@mailinator.com","password":"Test1234!"}')
-          ACCESS_TOKEN=$(echo "$LOGIN" | jq -r '.access_token // empty')
-          [ -n "$ACCESS_TOKEN" ]
-          # Health
-          curl -sSf "$PROD_URL/api/health" >/dev/null
-          # Create job
-          JOB=$(curl -sSf -X POST "$PROD_URL/api/jobs" \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"prompt":"CI smoke test"}')
-          echo "JOB=$JOB"
-          JOB_ID=$(echo "$JOB" | jq -r '.job.id // empty')
-          [ -n "$JOB_ID" ]
-          # Read job
-          curl -sSf -H "Authorization: Bearer $ACCESS_TOKEN" "$PROD_URL/api/jobs/$JOB_ID" >/dev/null
-          # Webhook (fake)
-          curl -sSf -X POST "$PROD_URL/api/webhooks/runpod" \
-            -H "Content-Type: application/json" \
-            -H "x-webhook-secret: $WEBHOOK_SECRET" \
-            -d "{\"id\":\"$JOB_ID\",\"status\":\"COMPLETED\",\"output\":{\"result_url\":\"https://example.com/result.mp4\"}}" >/dev/null
-          echo "✅ Smoke flow OK"
+          npm install -g vercel
+          vercel --token "${{ secrets.VERCEL_TOKEN }}" --prod --yes --scope "${{ secrets.VERCEL_ORG_ID }}" --force
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
   e2e-full:
     name: E2E Full (release)
