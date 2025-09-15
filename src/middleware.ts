@@ -86,5 +86,7 @@ export default async function middleware(
 }
 
 export const config = {
-  matcher: ['/((?!.+\\.[\\w]+$|_next|monitoring|api|trpc).*)', '/'], // Exclude API routes, tunnelRoute used in Sentry, and other static assets
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 };

@@ -1,3 +1,4 @@
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/contexts/AuthContext';
 
 export default function AuthLayout(props: {
@@ -5,8 +6,10 @@ export default function AuthLayout(props: {
   params: { locale: string };
 }) {
   return (
-    <AuthProvider>
-      {props.children}
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        {props.children}
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
