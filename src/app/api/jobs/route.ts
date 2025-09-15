@@ -2,15 +2,16 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { Env } from '@/libs/Env';
-import { createSupabaseAdmin, validateBearerToken } from '@/libs/supabase';
+import { validateBearerToken } from '@/libs/supabase-auth.server';
+import { createSupabaseAdmin } from '@/libs/supabase-server';
 
 export async function GET(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await validateBearerToken(
+    const user = await validateBearerToken(
       request.headers.get('authorization'),
     );
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -34,11 +35,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await validateBearerToken(
+    const user = await validateBearerToken(
       request.headers.get('authorization'),
     );
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
