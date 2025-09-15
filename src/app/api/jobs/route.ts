@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { Env } from '@/libs/Env';
+import { ENV_SERVER } from '@/libs/Env';
 import { validateBearerToken } from '@/libs/supabase-auth.server';
 import { createSupabaseAdmin } from '@/libs/supabase-server';
 
@@ -64,16 +64,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    if (Env.RUNPOD_API_KEY && Env.RUNPOD_ENDPOINT_ID) {
+    if (ENV_SERVER.RUNPOD_API_KEY && ENV_SERVER.RUNPOD_ENDPOINT_ID) {
       try {
-        const webhookUrl = Env.NEXT_PUBLIC_BASE_URL
-          ? `${Env.NEXT_PUBLIC_BASE_URL}/api/webhooks/runpod`
+        const webhookUrl = process.env.NEXT_PUBLIC_BASE_URL
+          ? `${process.env.NEXT_PUBLIC_BASE_URL}/api/webhooks/runpod`
           : undefined;
 
-        const runpodResponse = await fetch(`https://api.runpod.ai/v2/${Env.RUNPOD_ENDPOINT_ID}/run`, {
+        const runpodResponse = await fetch(`https://api.runpod.ai/v2/${ENV_SERVER.RUNPOD_ENDPOINT_ID}/run`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${Env.RUNPOD_API_KEY}`,
+            'Authorization': `Bearer ${ENV_SERVER.RUNPOD_API_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
