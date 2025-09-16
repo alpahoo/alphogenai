@@ -2,7 +2,9 @@
   "name": "saas-boilerplate",
   "version": "1.7.6",
   "scripts": {
-    "dev": "next dev",
+    "dev:spotlight": "spotlight-sidecar",
+    "dev:next": "next dev",
+    "dev": "run-p dev:*",
     "build": "next build",
     "start": "next start",
     "build-stats": "cross-env ANALYZE=true npm run build",
@@ -123,6 +125,7 @@
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3",
+    "vite": "5.4.20",
     "vite-tsconfig-paths": "^5.0.1",
     "vitest": "^2.1.9",
     "vitest-fail-on-console": "^0.7.1"

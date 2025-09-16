@@ -297,6 +297,9 @@ importers:
       typescript:
         specifier: ^5.6.3
         version: 5.8.3
+      vite:
+        specifier: 5.4.20
+        version: 5.4.20(@types/node@22.14.0)(lightningcss@1.29.2)(terser@5.44.0)
       vite-tsconfig-paths:
         specifier: ^5.0.1
         version: 5.1.4(typescript@5.8.3)(vite@5.4.20(@types/node@22.14.0)(lightningcss@1.29.2)(terser@5.44.0))
@@ -22483,7 +22486,7 @@ snapshots:
   vite@5.4.20(@types/node@22.14.0)(lightningcss@1.29.2)(terser@5.44.0):
     dependencies:
       esbuild: 0.21.5
-      postcss: 8.5.3
+      postcss: 8.5.6
       rollup: 4.50.2
     optionalDependencies:
       '@types/node': 22.14.0
