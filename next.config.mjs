@@ -32,19 +32,19 @@ const nextConfig = bundleAnalyzer(
 // Only enable Sentry in production if proper configuration is available
 const finalConfig = (process.env.SENTRY_ORG && process.env.SENTRY_PROJECT && process.env.NODE_ENV === 'production')
   ? withSentryConfig(
-    nextConfig,
-    {
-      org: process.env.SENTRY_ORG,
-      project: process.env.SENTRY_PROJECT,
-      silent: !process.env.CI,
-      widenClientFileUpload: true,
-      tunnelRoute: '/monitoring',
-      hideSourceMaps: true,
-      disableLogger: true,
-      automaticVercelMonitors: true,
-      telemetry: false,
-    },
-  )
+      nextConfig,
+      {
+        org: process.env.SENTRY_ORG,
+        project: process.env.SENTRY_PROJECT,
+        silent: !process.env.CI,
+        widenClientFileUpload: true,
+        tunnelRoute: '/monitoring',
+        hideSourceMaps: true,
+        disableLogger: true,
+        automaticVercelMonitors: true,
+        telemetry: false,
+      },
+    )
   : nextConfig;
 
 export default finalConfig;

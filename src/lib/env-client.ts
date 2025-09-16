@@ -1,0 +1,5 @@
+export const ENV_CLIENT = {
+  SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  COMMIT_SHA: process.env.NEXT_PUBLIC_COMMIT_SHA,
+} as const;
