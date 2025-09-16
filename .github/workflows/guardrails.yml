@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+        with: {fetch-depth: 0}
       - name: Fail if package.json changed (deps lock)
         run: |
           git diff --name-only origin/${{ github.base_ref }}... | grep -E '^package(-lock)?\.json$' && { echo "❌ package.json modified"; exit 1; } || echo "OK"

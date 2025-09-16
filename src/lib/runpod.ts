@@ -11,7 +11,7 @@ export async function createRunpodJob(prompt: string, jobId: string) {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${ENV_SERVER.RUNPOD_API_KEY}`,
+          'Authorization': `Bearer ${ENV_SERVER.RUNPOD_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -20,7 +20,7 @@ export async function createRunpodJob(prompt: string, jobId: string) {
             job_id: jobId,
           },
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -46,17 +46,17 @@ export async function getRunpodJobStatus(runpodJobId: string) {
       {
         method: 'GET',
         headers: {
-          Authorization: `Bearer ${ENV_SERVER.RUNPOD_API_KEY}`,
+          'Authorization': `Bearer ${ENV_SERVER.RUNPOD_API_KEY}`,
           'Content-Type': 'application/json',
         },
-      }
+      },
     );
 
     if (!response.ok) {
       console.error(
         'Runpod status API error:',
         response.status,
-        response.statusText
+        response.statusText,
       );
       return null;
     }

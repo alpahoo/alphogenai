@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { createSupabaseAdmin } from '@/libs/supabase-server';
+
 import { ENV_SERVER } from '@/lib/env-server';
+import { createSupabaseAdmin } from '@/libs/supabase-server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function POST(request: NextRequest) {
     if (!webhookSecret || webhookSecret !== ENV_SERVER.WEBHOOK_SECRET) {
       return NextResponse.json(
         { error: 'Invalid webhook secret' },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     if (!job_id) {
       return NextResponse.json(
         { error: 'Missing job_id in payload' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
     console.error('Error in webhook handler:', err);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

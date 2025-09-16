@@ -1,8 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { createSupabaseServer } from '@/libs/supabase-server';
+
 import { ENV_SERVER } from '@/lib/env-server';
 import { createRunpodJob } from '@/lib/runpod';
+import { createSupabaseServer } from '@/libs/supabase-server';
 
 export async function GET() {
   try {
@@ -33,7 +34,7 @@ export async function GET() {
     console.error('Error in GET /api/jobs:', err);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json(
         { error: 'Prompt is required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -106,13 +107,13 @@ export async function POST(request: NextRequest) {
         status: job.status,
         progress: job.progress,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (err) {
     console.error('Error in POST /api/jobs:', err);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

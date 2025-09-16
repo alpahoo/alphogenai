@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+
 import { ENV_CLIENT } from '@/lib/env-client';
 
 export async function GET() {
