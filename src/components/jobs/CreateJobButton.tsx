@@ -1,22 +1,22 @@
 'use client';
 
+import { Loader2, PlusCircle } from 'lucide-react';
 import React, { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Loader2 } from 'lucide-react';
-import { createClient } from '@/supabase-clients/client';
+import { createSupabaseBrowser } from '@/libs/supabase-browser';
 
-interface Job {
+type Job = {
   id: string;
   status: string;
   progress: number;
-}
+};
 
-interface CreateJobButtonProps {
+type CreateJobButtonProps = {
   onJobCreated?: (job: Job) => void;
-}
+};
 
 export function CreateJobButton({ onJobCreated }: CreateJobButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,7 +36,7 @@ export function CreateJobButton({ onJobCreated }: CreateJobButtonProps) {
     setError(null);
 
     try {
-      const supabase = createClient();
+      const supabase = createSupabaseBrowser();
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -50,7 +50,7 @@ export function CreateJobButton({ onJobCreated }: CreateJobButtonProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ prompt }),
       });
@@ -78,46 +78,48 @@ export function CreateJobButton({ onJobCreated }: CreateJobButtonProps) {
         onClick={() => setIsOpen(true)}
         className="flex items-center gap-2"
       >
-        <PlusCircle className="h-4 w-4" />
+        <PlusCircle className="size-4" />
         Create Job
       </Button>
     );
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Create New Job</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <div className="w-full max-w-md rounded-lg border bg-white shadow-sm">
+      <div className="p-6 pb-4">
+        <h3 className="text-lg font-semibold">Create New Job</h3>
+      </div>
+      <div className="space-y-4 px-6 pb-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="prompt">Prompt</Label>
             <Input
               id="prompt"
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              onChange={e => setPrompt(e.target.value)}
               placeholder="Enter your prompt..."
               disabled={isLoading}
             />
           </div>
 
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+            <div className="rounded bg-red-50 p-2 text-sm text-red-600">
               {error}
             </div>
           )}
 
           <div className="flex gap-2">
             <Button type="submit" disabled={isLoading} className="flex-1">
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                'Create Job'
-              )}
+              {isLoading
+                ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Creating...
+                    </>
+                  )
+                : (
+                    'Create Job'
+                  )}
             </Button>
             <Button
               type="button"
@@ -133,7 +135,7 @@ export function CreateJobButton({ onJobCreated }: CreateJobButtonProps) {
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
