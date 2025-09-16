@@ -1,15 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { createClient } from '@/supabase-clients/client';
+import React, { useEffect, useState } from 'react';
 
-interface Job {
+import { Button } from '@/components/ui/button';
+import { createSupabaseBrowser } from '@/libs/supabase-browser';
+
+type Job = {
   id: string;
   prompt: string;
   status: string;
@@ -17,11 +14,11 @@ interface Job {
   runpod_job_id?: string;
   created_at: string;
   updated_at: string;
-}
+};
 
-interface JobListProps {
+type JobListProps = {
   refreshTrigger?: number;
-}
+};
 
 export function JobList({ refreshTrigger }: JobListProps) {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -30,7 +27,7 @@ export function JobList({ refreshTrigger }: JobListProps) {
 
   const fetchJobs = async () => {
     try {
-      const supabase = createClient();
+      const supabase = createSupabaseBrowser();
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -88,16 +85,16 @@ export function JobList({ refreshTrigger }: JobListProps) {
         {Array(3)
           .fill(0)
           .map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-2 w-full" />
-              </CardContent>
-            </Card>
+            <div key={i} className="rounded-lg border bg-white shadow-sm">
+              <div className="p-6 pb-4">
+                <div className="mb-2 h-6 w-3/4 animate-pulse rounded bg-gray-200"></div>
+                <div className="h-4 w-1/2 animate-pulse rounded bg-gray-200"></div>
+              </div>
+              <div className="px-6 pb-6">
+                <div className="mb-2 h-4 w-full animate-pulse rounded bg-gray-200"></div>
+                <div className="h-2 w-full animate-pulse rounded bg-gray-200"></div>
+              </div>
+            </div>
           ))}
       </div>
     );
@@ -105,83 +102,99 @@ export function JobList({ refreshTrigger }: JobListProps) {
 
   if (error) {
     return (
-      <Card>
-        <CardContent className="pt-6">
+      <div className="rounded-lg border bg-white shadow-sm">
+        <div className="p-6">
           <div className="text-center text-red-600">
             <p>{error}</p>
             <Button variant="outline" onClick={fetchJobs} className="mt-2">
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className="mr-2 size-4" />
               Retry
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   if (jobs.length === 0) {
     return (
-      <Card>
-        <CardContent className="pt-6">
+      <div className="rounded-lg border bg-white shadow-sm">
+        <div className="p-6">
           <div className="text-center text-gray-500">
             <p>No jobs found. Create your first job to get started!</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Your Jobs</h3>
         <Button variant="outline" size="sm" onClick={fetchJobs}>
-          <RefreshCw className="h-4 w-4 mr-2" />
+          <RefreshCw className="mr-2 size-4" />
           Refresh
         </Button>
       </div>
 
-      {jobs.map((job) => (
-        <Card key={job.id}>
-          <CardHeader>
-            <div className="flex justify-between items-start">
-              <CardTitle className="text-base">
-                Job {job.id.slice(0, 8)}...
-              </CardTitle>
-              <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+      {jobs.map(job => (
+        <div key={job.id} className="rounded-lg border bg-white shadow-sm">
+          <div className="p-6 pb-4">
+            <div className="flex items-start justify-between">
+              <h4 className="text-base font-semibold">
+                Job
+                {' '}
+                {job.id.slice(0, 8)}
+                ...
+              </h4>
+              <span className={`rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(job.status)}`}>
+                {job.status}
+              </span>
             </div>
             <p className="text-sm text-gray-600">
-              Created: {formatDate(job.created_at)}
+              Created:
+              {' '}
+              {formatDate(job.created_at)}
             </p>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div className="px-6 pb-6">
             <div className="space-y-3">
               <div>
-                <p className="text-sm font-medium mb-1">Prompt:</p>
-                <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
+                <p className="mb-1 text-sm font-medium">Prompt:</p>
+                <p className="rounded bg-gray-50 p-2 text-sm text-gray-700">
                   {job.prompt}
                 </p>
               </div>
 
               <div>
-                <div className="flex justify-between items-center mb-1">
+                <div className="mb-1 flex items-center justify-between">
                   <span className="text-sm font-medium">Progress:</span>
-                  <span className="text-sm text-gray-600">{job.progress}%</span>
+                  <span className="text-sm text-gray-600">
+                    {job.progress}
+                    %
+                  </span>
                 </div>
-                <Progress value={job.progress} className="h-2" />
+                <div className="h-2 w-full rounded-full bg-gray-200">
+                  <div
+                    className="h-2 rounded-full bg-blue-600 transition-all duration-300"
+                    style={{ width: `${job.progress}%` }}
+                  >
+                  </div>
+                </div>
               </div>
 
               {job.runpod_job_id && (
                 <div>
-                  <p className="text-sm font-medium mb-1">Runpod Job ID:</p>
-                  <p className="text-xs text-gray-500 font-mono">
+                  <p className="mb-1 text-sm font-medium">Runpod Job ID:</p>
+                  <p className="font-mono text-xs text-gray-500">
                     {job.runpod_job_id}
                   </p>
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ))}
     </div>
   );
