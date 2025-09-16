@@ -1,12 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/supabase-clients/server';
+import { createSupabaseServer } from '@/libs/supabase-server';
 import { ENV_SERVER } from '@/lib/env-server';
 import { createRunpodJob } from '@/lib/runpod';
 
 export async function GET() {
   try {
-    const supabase = await createSupabaseClient();
+    const supabase = createSupabaseServer();
 
     const {
       data: { user },
@@ -40,7 +40,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createSupabaseClient();
+    const supabase = createSupabaseServer();
 
     const {
       data: { user },

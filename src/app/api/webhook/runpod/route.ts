@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/supabase-clients/server';
+import { createSupabaseAdmin } from '@/libs/supabase-server';
 import { ENV_SERVER } from '@/lib/env-server';
 
 export async function POST(request: NextRequest) {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createSupabaseClient();
+    const supabase = createSupabaseAdmin();
 
     const updateData: Record<string, string | number> = {
       updated_at: new Date().toISOString(),
