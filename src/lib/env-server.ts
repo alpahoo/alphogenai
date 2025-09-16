@@ -1,0 +1,6 @@
+export const ENV_SERVER = {
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  RUNPOD_API_KEY: process.env.RUNPOD_API_KEY,
+  RUNPOD_ENDPOINT_ID: process.env.RUNPOD_ENDPOINT_ID,
+  WEBHOOK_SECRET: process.env.WEBHOOK_SECRET!,
+} as const;

@@ -1,0 +1,20 @@
+name: Guardrails
+on: [pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Fail if package.json changed (deps lock)
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}... | grep -E '^package(-lock)?\.json$' && { echo "❌ package.json modified"; exit 1; } || echo "OK"
+      - name: Fail if core starter files changed
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...)
+          echo "$CHANGED" | grep -E '^app/(layout|page)\.tsx|^app/(auth|api)/.*(auth|session)|^next\.config\.js|^tsconfig\.json|^eslint' && { echo "❌ core starter modified"; exit 1; } || echo "OK"
+      - name: Allow only whitelisted paths
+        run: |
+          echo "$CHANGED"
+          echo "$CHANGED" | grep -vE '^(app/api/(health|jobs|webhook/runpod)/|app/dashboard/|components/jobs/|lib/(runpod|env-client|env-server|db\.schema\.sql)|prisma/|drizzle/)' \
+            && { echo "❌ files outside allowed areas"; exit 1; } || echo "OK"
