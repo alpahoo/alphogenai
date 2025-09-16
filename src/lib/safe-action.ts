@@ -28,7 +28,7 @@ export const actionClient = createSafeActionClient().use(
 );
 
 export const authActionClient = actionClient.use(async ({ next }) => {
-  const supabase = createSupabaseClient();
+  const supabase = await createSupabaseClient();
   const {
     data: { user },
     error: userError,
