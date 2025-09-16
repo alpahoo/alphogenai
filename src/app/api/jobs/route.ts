@@ -1,21 +1,22 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { createSupabaseClient } from '@/supabase-clients/server';
+import { ENV_SERVER } from '@/lib/env-server';
+import { createRunpodJob } from '@/lib/runpod';
 
-import { ENV_CLIENT, ENV_SERVER } from '@/libs/Env';
-import { validateBearerToken } from '@/libs/supabase-auth.server';
-import { createSupabaseAdmin } from '@/libs/supabase-server';
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const user = await validateBearerToken(
-      request.headers.get('authorization'),
-    );
+    const supabase = await createSupabaseClient();
 
-    if (!user) {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = createSupabaseAdmin();
     const { data: jobs, error } = await supabase
       .from('jobs')
       .select('*')
@@ -23,33 +24,43 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) {
+      console.error('Error fetching jobs:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ jobs });
   } catch (err) {
-    console.error('Error fetching jobs:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error in GET /api/jobs:', err);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await validateBearerToken(
-      request.headers.get('authorization'),
-    );
+    const supabase = await createSupabaseClient();
 
-    if (!user) {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { prompt } = await request.json();
 
     if (!prompt || typeof prompt !== 'string') {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Prompt is required' },
+        { status: 400 }
+      );
     }
 
-    const { data: job, error } = await createSupabaseAdmin()
+    const { data: job, error } = await supabase
       .from('jobs')
       .insert({
         user_id: user.id,
@@ -61,34 +72,16 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
+      console.error('Error creating job:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     if (ENV_SERVER.RUNPOD_API_KEY && ENV_SERVER.RUNPOD_ENDPOINT_ID) {
       try {
-        const webhookUrl = ENV_CLIENT.BASE_URL
-          ? `${ENV_CLIENT.BASE_URL}/api/webhooks/runpod`
-          : undefined;
+        const runpodData = await createRunpodJob(prompt, job.id);
 
-        const runpodResponse = await fetch(`https://api.runpod.ai/v2/${ENV_SERVER.RUNPOD_ENDPOINT_ID}/run`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${ENV_SERVER.RUNPOD_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            input: {
-              prompt,
-              job_id: job.id,
-            },
-            ...(webhookUrl && { webhook: webhookUrl }),
-          }),
-        });
-
-        if (runpodResponse.ok) {
-          const runpodData = await runpodResponse.json();
-
-          const { error: updateError } = await createSupabaseAdmin()
+        if (runpodData?.id) {
+          const { error: updateError } = await supabase
             .from('jobs')
             .update({
               status: 'running',
@@ -102,13 +95,24 @@ export async function POST(request: NextRequest) {
             job.runpod_job_id = runpodData.id;
           }
         }
-      } catch {
+      } catch (runpodError) {
+        console.error('Runpod integration error:', runpodError);
       }
     }
 
-    return NextResponse.json({ job }, { status: 201 });
+    return NextResponse.json(
+      {
+        id: job.id,
+        status: job.status,
+        progress: job.progress,
+      },
+      { status: 201 }
+    );
   } catch (err) {
-    console.error('Error creating job:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error in POST /api/jobs:', err);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
