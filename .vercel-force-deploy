@@ -1,0 +1,4 @@
+# Force Vercel redeploy to clear routing cache
+# This file triggers a complete redeploy to ensure API routes are properly accessible
+# Created: 2025-09-30 23:30:45 UTC
+DEPLOYMENT_TRIGGER=1759274901
