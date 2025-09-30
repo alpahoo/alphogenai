@@ -28,7 +28,7 @@ Configure these in GitHub Repository Settings > Secrets and Variables > Actions:
 - `WEBHOOK_SECRET`: [Webhook secret for Runpod]
 
 ## Webhook Configuration
-Configure Runpod webhook URL: https://app.alphogen.com/api/webhooks/runpod
+Configure Runpod webhook URL: https://app.alphogen.com/api/runpod/webhook
 
 ## Test User
 Stable test user for E2E testing: qa-user@mailinator.com / Test1234!
@@ -45,7 +45,7 @@ Stable test user for E2E testing: qa-user@mailinator.com / Test1234!
 - `GET /api/health`: Health check
 - `POST /api/jobs`: Create new job (requires authentication)
 - `GET /api/jobs/:id`: Get job details (requires authentication)
-- `POST /api/webhooks/runpod`: Runpod webhook handler (requires webhook secret)
+- `POST /api/runpod/webhook`: Runpod webhook handler (requires webhook secret)
 
 ## Testing Commands
 
@@ -63,7 +63,7 @@ curl -X POST "https://app.alphogen.com/api/jobs" \
   -d '{"prompt":"Test video generation"}'
 
 # Test webhook
-curl -X POST "https://app.alphogen.com/api/webhooks/runpod" \
+curl -X POST "https://app.alphogen.com/api/runpod/webhook" \
   -H "Content-Type: application/json" \
   -H "x-webhook-secret: [WEBHOOK_SECRET]" \
   -d '{"id":"[JOB_ID]","status":"COMPLETED","output":{"result_url":"https://example.com/result.mp4"}}'
