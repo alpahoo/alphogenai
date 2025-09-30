@@ -24,7 +24,7 @@ export const jobsSchema = pgTable('jobs', {
   prompt: text('prompt').notNull(),
   status: text('status').notNull().default('queued'), // queued, running, done, error
   progress: integer('progress').default(0),
-  resultR2Key: text('result_r2_key'),
+  resultKey: text('result_key'),
   updatedAt: timestamp('updated_at', { mode: 'date' })
     .defaultNow()
     .$onUpdate(() => new Date())

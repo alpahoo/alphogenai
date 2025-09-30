@@ -10,7 +10,7 @@ type Job = {
   prompt: string;
   status: 'queued' | 'running' | 'done' | 'error';
   progress: number;
-  result_r2_key?: string;
+  result_key?: string;
   created_at: string;
   updated_at: string;
 };
@@ -169,10 +169,10 @@ export const JobsList = () => {
                       </div>
                     </div>
 
-                    {job.status === 'done' && job.result_r2_key && (
+                    {job.status === 'done' && job.result_key && (
                       <div className="mt-4">
                         <a
-                          href={`/api/assets/${job.result_r2_key}`}
+                          href={`/api/assets/${job.result_key}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center rounded-md border border-transparent bg-indigo-100 px-3 py-2 text-sm font-medium leading-4 text-indigo-700 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
