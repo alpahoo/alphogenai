@@ -4,10 +4,22 @@
       "maxDuration": 30
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "src": "/api/health",
+      "dest": "/api/health"
+    },
+    {
+      "src": "/api/debug/env",
+      "dest": "/api/debug/env"
+    },
+    {
+      "src": "/api/runpod/webhook",
+      "dest": "/api/runpod/webhook"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
     }
   ]
 }
