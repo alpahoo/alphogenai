@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     if (ENV_SERVER.RUNPOD_API_KEY && ENV_SERVER.RUNPOD_ENDPOINT_ID) {
       try {
         const webhookUrl = ENV_CLIENT.BASE_URL
-          ? `${ENV_CLIENT.BASE_URL}/api/webhooks/runpod`
+          ? `${ENV_CLIENT.BASE_URL}/api/runpod/webhook`
           : undefined;
 
         const runpodResponse = await fetch(`https://api.runpod.ai/v2/${ENV_SERVER.RUNPOD_ENDPOINT_ID}/run`, {
