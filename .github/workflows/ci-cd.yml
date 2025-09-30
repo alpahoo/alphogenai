@@ -70,7 +70,7 @@ jobs:
         run: |
           set -euo pipefail
           SUPABASE_PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://\([^.]*\)\.supabase\.co.*|\1|')
-          
+
           # Apply main jobs table migration
           echo "Applying jobs table migration..."
           SQL=$(cat migrations/20250916192842_alphogen_jobs.sql)
@@ -79,7 +79,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"query\": $(printf '%s' "$SQL" | jq -Rs .)}" \
             --fail-with-body
-          
+
           # Apply result_key column migration
           echo "Applying result_key column migration..."
           SQL=$(cat migrations/20250917000000_add_result_key_to_jobs.sql)
