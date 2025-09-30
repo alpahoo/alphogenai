@@ -70,7 +70,19 @@ jobs:
         run: |
           set -euo pipefail
           SUPABASE_PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://\([^.]*\)\.supabase\.co.*|\1|')
-          SQL=$(cat migrations/0002_jobs_progress_and_constraints.sql)
+          
+          # Apply main jobs table migration
+          echo "Applying jobs table migration..."
+          SQL=$(cat migrations/20250916192842_alphogen_jobs.sql)
+          curl -sS -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\": $(printf '%s' "$SQL" | jq -Rs .)}" \
+            --fail-with-body
+          
+          # Apply result_key column migration
+          echo "Applying result_key column migration..."
+          SQL=$(cat migrations/20250917000000_add_result_key_to_jobs.sql)
           curl -sS -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query" \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
@@ -95,7 +107,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ADMIN_BOOT_PWD: ${{ secrets.ADMIN_BOOT_PWD }}
-        run: node scripts/create-admin-user.js
+        run: node scripts/create-digitalpaho-admin.js
 
   e2e-smoke:
     name: E2E Smoke (main)
