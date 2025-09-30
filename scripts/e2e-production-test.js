@@ -15,8 +15,8 @@ async function runE2ETest() {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: 'founder@alphogen.com',
-      password: adminPassword,
+      email: 'digitalpaho@outlook.com',
+      password: adminPassword || 'C@mer2025',
     });
 
     if (authError) {
@@ -60,7 +60,7 @@ async function runE2ETest() {
     console.log(`✅ Job retrieved successfully: ${retrievedJob.job.id}`);
 
     console.log('\n4️⃣ Testing webhook simulation...');
-    const webhookResponse = await fetch(`${PROD_URL}/api/webhooks/runpod`, {
+    const webhookResponse = await fetch(`${PROD_URL}/api/runpod/webhook`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -96,7 +96,7 @@ async function runE2ETest() {
     console.log('✅ Job update verified successfully');
 
     console.log('\n6️⃣ Testing webhook security...');
-    const unauthorizedWebhookResponse = await fetch(`${PROD_URL}/api/webhooks/runpod`, {
+    const unauthorizedWebhookResponse = await fetch(`${PROD_URL}/api/runpod/webhook`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -116,7 +116,7 @@ async function runE2ETest() {
 
     console.log('\n🎉 E2E Test PASSED - All systems operational!');
     console.log('\n📊 Test Summary:');
-    console.log(`   ✅ Admin login: founder@alphogen.com`);
+    console.log(`   ✅ Admin login: digitalpaho@outlook.com`);
     console.log(`   ✅ Job creation: ${jobId}`);
     console.log(`   ✅ Job retrieval: Working`);
     console.log(`   ✅ Webhook processing: Working`);
