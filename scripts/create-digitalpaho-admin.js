@@ -1,8 +1,8 @@
 const { createClient } = require('@supabase/supabase-js');
 
 async function createDigitalpahoAdmin() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY;
   const adminPassword = 'C@mer2025';
 
   if (!supabaseUrl || !serviceRoleKey) {
@@ -34,17 +34,16 @@ async function createDigitalpahoAdmin() {
 
         const { data: users } = await supabase.auth.admin.listUsers();
         const existingUser = users.users.find(u => u.email === 'digitalpaho@outlook.com');
-        
         if (existingUser) {
           const { error: updateError } = await supabase.auth.admin.updateUserById(
             existingUser.id,
-            { 
+            {
               password: adminPassword,
               user_metadata: {
                 role: 'application_admin',
                 created_by: 'system',
-              }
-            }
+              },
+            },
           );
 
           if (updateError) {

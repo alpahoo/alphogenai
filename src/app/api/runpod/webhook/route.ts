@@ -2,8 +2,8 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { ENV_SERVER } from '@/libs/Env';
-import { createSupabaseAdmin } from '@/libs/supabase-server';
 import { R2Client } from '@/libs/r2-client';
+import { createSupabaseAdmin } from '@/libs/supabase-server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,8 +20,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing runpod job ID' }, { status: 400 });
     }
 
-    console.log('runpod.webhook.received', { runpodJobId, status });
-
     const supabase = createSupabaseAdmin();
     const updateData: any = {
       updated_at: new Date().toISOString(),
@@ -30,18 +28,18 @@ export async function POST(request: NextRequest) {
     if (status === 'COMPLETED' && output?.result_url) {
       try {
         const response = await fetch(output.result_url);
-        if (!response.ok) throw new Error('Failed to download result');
-        
+        if (!response.ok) {
+          throw new Error('Failed to download result');
+        }
+
         const buffer = await response.arrayBuffer();
         const r2Client = new R2Client();
         const key = `results/${runpodJobId}-${Date.now()}.mp4`;
-        const r2Url = await r2Client.uploadFile(key, new Uint8Array(buffer), 'video/mp4');
-        
+        await r2Client.uploadFile(key, new Uint8Array(buffer), 'video/mp4');
+
         updateData.status = 'done';
         updateData.progress = 100;
         updateData.result_key = key;
-        
-        console.log('r2.upload.success', { key, r2Url });
       } catch (error) {
         console.error('R2 upload failed:', error);
         updateData.status = 'error';
@@ -76,7 +74,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    console.log('jobs.update.from_webhook.success', { jobId: data.id, status: updateData.status });
     return NextResponse.json({ success: true, job: data });
   } catch (error) {
     console.error('runpod.webhook.error', error);

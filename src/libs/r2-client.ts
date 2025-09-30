@@ -1,5 +1,6 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
 import { ENV_SERVER } from './Env';
 
 export class R2Client {
@@ -8,8 +9,8 @@ export class R2Client {
   private publicBaseUrl: string;
 
   constructor() {
-    if (!ENV_SERVER.CLOUDFLARE_ACCOUNT_ID || !ENV_SERVER.CLOUDFLARE_R2_ACCESS_KEY_ID || 
-        !ENV_SERVER.CLOUDFLARE_R2_SECRET_ACCESS_KEY || !ENV_SERVER.CLOUDFLARE_R2_BUCKET) {
+    if (!ENV_SERVER.CLOUDFLARE_ACCOUNT_ID || !ENV_SERVER.CLOUDFLARE_R2_ACCESS_KEY_ID
+      || !ENV_SERVER.CLOUDFLARE_R2_SECRET_ACCESS_KEY || !ENV_SERVER.CLOUDFLARE_R2_BUCKET) {
       throw new Error('Missing Cloudflare R2 configuration');
     }
 
@@ -21,12 +22,12 @@ export class R2Client {
         secretAccessKey: ENV_SERVER.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
       },
     });
-    
+
     this.bucket = ENV_SERVER.CLOUDFLARE_R2_BUCKET;
     this.publicBaseUrl = ENV_SERVER.CLOUDFLARE_R2_PUBLIC_BASE_URL || '';
   }
 
-  async uploadFile(key: string, body: Buffer | Uint8Array, contentType?: string): Promise<string> {
+  async uploadFile(key: string, body: Uint8Array, contentType?: string): Promise<string> {
     const command = new PutObjectCommand({
       Bucket: this.bucket,
       Key: key,
