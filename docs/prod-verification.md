@@ -40,7 +40,7 @@ This report documents the comprehensive production stabilization of AlphoGenAI a
   - Idempotent creation (updates password if user exists)
 
 ### 4. ✅ Webhook Security
-- **Endpoint:** `/api/webhooks/runpod`
+- **Endpoint:** `/api/runpod/webhook`
 - **Security:** Requires `x-webhook-secret` header
 - **Functionality:**
   - Updates job status and progress
@@ -107,7 +107,7 @@ Added comprehensive workflow steps:
 1. **Admin Login** ✅ - founder@alphogen.com authentication
 2. **Job Creation** ✅ - POST /api/jobs with Bearer token
 3. **Job Retrieval** ✅ - GET /api/jobs/:id with authentication
-4. **Webhook Processing** ✅ - POST /api/webhooks/runpod with secret
+4. **Webhook Processing** ✅ - POST /api/runpod/webhook with secret
 5. **Job Update Verification** ✅ - Status updated to 'done' with 100% progress
 6. **Security Validation** ✅ - 401 response without webhook secret
 
@@ -117,7 +117,7 @@ Added comprehensive workflow steps:
 - `GET /api/debug/session` → Session status without leaking data
 - `POST /api/jobs` → Job creation with RunPod integration
 - `GET /api/jobs/:id` → Job retrieval with proper authentication
-- `POST /api/webhooks/runpod` → Secure webhook processing
+- `POST /api/runpod/webhook` → Secure webhook processing
 
 ## 🔐 Security Measures
 

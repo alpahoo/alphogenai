@@ -82,7 +82,7 @@ jobs:
 
                 # Test webhook endpoint
                 echo "Testing webhook endpoint..."
-                WEBHOOK_RESPONSE=$(curl -s -X POST "${PRODUCTION_URL}/api/webhooks/runpod" \
+                WEBHOOK_RESPONSE=$(curl -s -X POST "${PRODUCTION_URL}/api/runpod/webhook" \
                   -H "Content-Type: application/json" \
                   -H "x-webhook-secret: ${{ secrets.WEBHOOK_SECRET || 'test-secret' }}" \
                   -d "{\"id\":\"$JOB_ID\",\"status\":\"COMPLETED\",\"output\":{\"result_url\":\"https://example.com/result.mp4\"}}")
