@@ -29,7 +29,7 @@ async function createDigitalpahoAdmin() {
     });
 
     if (error) {
-      if (error.message.includes('already registered')) {
+      if (error.message.includes('already registered') || error.message.includes('already been registered')) {
         console.log('✅ Admin user already exists: digitalpaho@outlook.com');
 
         const { data: users } = await supabase.auth.admin.listUsers();
