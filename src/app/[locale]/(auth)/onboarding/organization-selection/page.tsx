@@ -9,10 +9,8 @@ const OrganizationSelectionPage = (props: { params: { locale: string } }) => {
 
   useEffect(() => {
     try {
-      console.log('onboarding.organization-selection.redirect', { locale: props.params.locale });
       router.push(`/${props.params.locale}/dashboard`);
     } catch (err) {
-      console.error('onboarding.organization-selection.error', err);
       setError(err instanceof Error ? err.message : 'Unknown error occurred');
     }
   }, [router, props.params.locale]);
@@ -22,11 +20,12 @@ const OrganizationSelectionPage = (props: { params: { locale: string } }) => {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <h2 className="mb-4 text-2xl font-bold text-red-600">Setup Error</h2>
-          <p className="text-gray-600 mb-4">An error occurred during account setup:</p>
-          <p className="text-red-500 mb-4">{error}</p>
-          <button 
+          <p className="mb-4 text-gray-600">An error occurred during account setup:</p>
+          <p className="mb-4 text-red-500">{error}</p>
+          <button
+            type="button"
             onClick={() => router.push(`/${props.params.locale}/dashboard`)}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
           >
             Try Again
           </button>
