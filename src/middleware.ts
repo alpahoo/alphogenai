@@ -25,6 +25,15 @@ export default async function middleware(
   _: NextFetchEvent,
 ) {
   if (
+    request.nextUrl.pathname.startsWith('/api/')
+    || request.nextUrl.pathname.startsWith('/_next/')
+    || request.nextUrl.pathname.startsWith('/assets/')
+    || /\.[^/]+$/.test(request.nextUrl.pathname)
+  ) {
+    return NextResponse.next();
+  }
+
+  if (
     request.nextUrl.pathname.includes('/sign-in')
     || request.nextUrl.pathname.includes('/sign-up')
     || isProtectedRoute(request.nextUrl.pathname)
@@ -86,5 +95,5 @@ export default async function middleware(
 }
 
 export const config = {
-  matcher: ['/((?!.+\\.[\\w]+$|_next|monitoring|api|trpc).*)', '/'], // Exclude API routes, tunnelRoute used in Sentry, and other static assets
+  matcher: ['/((?!api|_next|static|assets|.*\\..*).*)', '/'], // Exclude API routes, static assets, and files with extensions
 };
